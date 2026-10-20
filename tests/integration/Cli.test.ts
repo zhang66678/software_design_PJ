@@ -131,6 +131,48 @@ describe("CLI entry", () => {
     assert.deepEqual(positions, [60, 59, 60]);
   });
 
+  it("scales and sets geometry, styles and text with undo and redo", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init", "create rect r1 10 20 100 50",
+        "scale r1 2", "show r1", "undo", "show r1", "redo",
+        "set r1 fill #4a90d9", "set r1 stroke-width 2", "set r1 width 80",
+        "show r1", "undo", "show r1", "redo",
+        'create text title 20 40 "My Diagram"',
+        'set title text "  新 标题  "', "show title", "undo", "show title", "redo",
+        'set title text ""', "show title", "undo",
+        "set r1 width -1", "scale r1 0", "set title font-size 16", 'set r1 x ""',
+        "redo", "show title",
+        "create line edge 1 2 3 4", "scale edge 0.5", "set edge stroke black", "show edge",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, [
+      "error: rectangle dimensions must be non-negative",
+      "error: scale factor must be positive",
+      "error: unknown attribute: font-size",
+      "error: x must be a finite number",
+      "",
+    ].join("\n"));
+    for (const output of [
+      "rect#r1  parent=svg\n  x=20 y=40 width=200 height=100\n",
+      "rect#r1  parent=svg\n  x=10 y=20 width=100 height=50\n",
+      "rect#r1  parent=svg\n  x=20 y=40 width=80 height=100\n  fill=#4a90d9 stroke-width=2\n",
+      "rect#r1  parent=svg\n  x=20 y=40 width=200 height=100\n  fill=#4a90d9 stroke-width=2\n",
+      'text#title  parent=svg\n  x=20 y=40\n  text="  新 标题  "\n',
+      'text#title  parent=svg\n  x=20 y=40\n  text="My Diagram"\n',
+      'text#title  parent=svg\n  x=20 y=40\n  text=""\n',
+      'redone: text#title updated: text=""',
+      "line#edge  parent=svg\n  x1=0.5 y1=1 x2=1.5 y2=2\n  stroke=black\n",
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+  });
+
   it("creates, displays, moves and restores lines and text", () => {
     const result = spawnSync(execPath, [entry], {
       input: [

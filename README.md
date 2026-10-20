@@ -53,6 +53,16 @@ create line edge 120 100 160 100 black
 create text title 20 40 "我的流程图"
 ```
 
+缩放和修改属性：
+
+```text
+scale r1 2
+set r1 fill #f5a623
+set r1 width 160
+set title text "流程图 v2"
+show r1
+```
+
 ## 命令
 
 | 语法 | 用途 |
@@ -64,6 +74,8 @@ create text title 20 40 "我的流程图"
 | `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段，指定两端坐标及可选描边色 |
 | `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
 | `move <id> <dx> <dy>` | 按增量移动图形 |
+| `scale <id> <factor>` | 按正有限因子同时缩放位置和尺寸 |
+| `set <id> <attr> <value>` | 修改几何属性、公共样式或文字内容 |
 | `tree [id]` | 显示文档结构与几何属性，或只显示指定图形 |
 | `show <id>` | 显示图形属性与父节点 |
 | `help` | 显示命令语法 |
@@ -73,6 +85,8 @@ create text title 20 40 "我的流程图"
 整行以 `#` 开头时作为注释；颜色中的 `#` 会保留。带空格的参数用双引号包裹，例如 `"rgb(255, 0, 0)"`。编辑失败时输出一行以 `error:` 开头的信息，并保留文档与历史，随后可以继续输入命令。
 
 坐标允许有限浮点数，宽高与半径允许为零但不能为负数。
+
+`scale` 基于坐标原点，同时乘上全部几何属性；文字缩放作用于 x/y。`set` 支持 `fill`、`stroke`、`stroke-width` 及各图形的几何属性（如矩形的 x/y/width/height）；文字内容使用 `text` 修改。
 
 `tree`、`show` 和 `help` 不改变编辑历史。成功新建画布后禁止撤销、重做，下一次成功编辑开始新的历史；撤销后执行新的编辑会清空重做记录。
 

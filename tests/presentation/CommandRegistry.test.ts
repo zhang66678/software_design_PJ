@@ -26,6 +26,8 @@ describe("CommandRegistry", () => {
       "  init [w] [h]",
       "  create <type> <id> [params...]",
       "  move <id> <dx> <dy>",
+      "  scale <id> <factor>",
+      "  set <id> <attr> <value>",
       "  tree [id]",
       "  show <id>",
       "  help",
@@ -48,6 +50,7 @@ describe("CommandRegistry", () => {
 
   for (const line of [
     "init 1 2 3", "create", "create rect", "move r1 1", "move r1 1 2 3",
+    "scale r1", "set r1 fill",
     "tree r1 r2", "show", "show r1 r2", "help extra", "undo extra", "redo extra",
   ]) {
     it(`rejects the wrong argument count in ${JSON.stringify(line)}`, () => {

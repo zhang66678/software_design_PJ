@@ -4,6 +4,8 @@ import { CreateCommand } from "../../application/commands/CreateCommand.js";
 import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
 import { RedoCommand } from "../../application/commands/RedoCommand.js";
+import { ScaleCommand } from "../../application/commands/ScaleCommand.js";
+import { SetCommand } from "../../application/commands/SetCommand.js";
 import { UndoCommand } from "../../application/commands/UndoCommand.js";
 import type { ShapeFactory } from "../../application/factories/ShapeFactory.js";
 import type { EditorSession } from "../../application/session/EditorSession.js";
@@ -49,6 +51,20 @@ export class CommandRegistry {
         create: (args, syntax) => {
           args.expectCount(3, 3, syntax);
           return new MoveCommand(args.stringAt(0, "id"), args.numberAt(1, "dx"), args.numberAt(2, "dy"));
+        },
+      }],
+      ["scale", {
+        syntax: "scale <id> <factor>",
+        create: (args, syntax) => {
+          args.expectCount(2, 2, syntax);
+          return new ScaleCommand(args.stringAt(0, "id"), args.numberAt(1, "factor"));
+        },
+      }],
+      ["set", {
+        syntax: "set <id> <attr> <value>",
+        create: (args, syntax) => {
+          args.expectCount(3, 3, syntax);
+          return new SetCommand(args.stringAt(0, "id"), args.stringAt(1, "attribute"), args.stringAt(2, "value"));
         },
       }],
       ["tree", {

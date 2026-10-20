@@ -6,8 +6,8 @@ import { Style } from "./Style.js";
 export class Ellipse extends Shape {
   #cx: number;
   #cy: number;
-  readonly #rx: number;
-  readonly #ry: number;
+  #rx: number;
+  #ry: number;
 
   public constructor(
     id: string, cx: number, cy: number, rx: number, ry: number, style: Style = new Style(),
@@ -25,11 +25,12 @@ export class Ellipse extends Shape {
   }
 
   public override move(dx: number, dy: number): void {
-    const cx = this.#cx + dx;
-    const cy = this.#cy + dy;
-    Ellipse.validateGeometry(cx, cy, this.#rx, this.#ry);
-    this.#cx = cx;
-    this.#cy = cy;
+    this.updateGeometry(this.#cx + dx, this.#cy + dy, this.#rx, this.#ry);
+  }
+
+  public override scale(factor: number): void {
+    this.validateScaleFactor(factor);
+    this.updateGeometry(this.#cx * factor, this.#cy * factor, this.#rx * factor, this.#ry * factor);
   }
 
   public override clone(): Ellipse {
@@ -38,6 +39,21 @@ export class Ellipse extends Shape {
 
   protected override geometryAttributes(): ShapeAttributes {
     return { cx: this.#cx, cy: this.#cy, rx: this.#rx, ry: this.#ry };
+  }
+
+  protected override setOwnAttribute(attribute: string, value: string): void {
+    const geometry = this.updatedGeometry(
+      { cx: this.#cx, cy: this.#cy, rx: this.#rx, ry: this.#ry }, attribute, value,
+    );
+    this.updateGeometry(geometry.cx, geometry.cy, geometry.rx, geometry.ry);
+  }
+
+  private updateGeometry(cx: number, cy: number, rx: number, ry: number): void {
+    Ellipse.validateGeometry(cx, cy, rx, ry);
+    this.#cx = cx;
+    this.#cy = cy;
+    this.#rx = rx;
+    this.#ry = ry;
   }
 
   private static validateGeometry(cx: number, cy: number, rx: number, ry: number): void {

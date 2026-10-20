@@ -6,8 +6,8 @@ import { Style } from "./Style.js";
 export class Rect extends Shape {
   #x: number;
   #y: number;
-  readonly #width: number;
-  readonly #height: number;
+  #width: number;
+  #height: number;
 
   public constructor(
     id: string,
@@ -46,11 +46,12 @@ export class Rect extends Shape {
   }
 
   public override move(dx: number, dy: number): void {
-    const nextX = this.#x + dx;
-    const nextY = this.#y + dy;
-    Rect.validateGeometry(nextX, nextY, this.#width, this.#height);
-    this.#x = nextX;
-    this.#y = nextY;
+    this.updateGeometry(this.#x + dx, this.#y + dy, this.#width, this.#height);
+  }
+
+  public override scale(factor: number): void {
+    this.validateScaleFactor(factor);
+    this.updateGeometry(this.#x * factor, this.#y * factor, this.#width * factor, this.#height * factor);
   }
 
   public override clone(): Rect {
@@ -71,6 +72,21 @@ export class Rect extends Shape {
       width: this.#width,
       height: this.#height,
     };
+  }
+
+  protected override setOwnAttribute(attribute: string, value: string): void {
+    const geometry = this.updatedGeometry(
+      { x: this.#x, y: this.#y, width: this.#width, height: this.#height }, attribute, value,
+    );
+    this.updateGeometry(geometry.x, geometry.y, geometry.width, geometry.height);
+  }
+
+  private updateGeometry(x: number, y: number, width: number, height: number): void {
+    Rect.validateGeometry(x, y, width, height);
+    this.#x = x;
+    this.#y = y;
+    this.#width = width;
+    this.#height = height;
   }
 
   private static validateGeometry(

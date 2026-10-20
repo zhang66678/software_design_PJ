@@ -6,7 +6,7 @@ import { Style } from "./Style.js";
 export class Text extends Shape {
   #x: number;
   #y: number;
-  readonly #content: string;
+  #content: string;
 
   public constructor(id: string, x: number, y: number, content: string, style: Style = new Style()) {
     super(id, style);
@@ -21,11 +21,12 @@ export class Text extends Shape {
   }
 
   public override move(dx: number, dy: number): void {
-    const x = this.#x + dx;
-    const y = this.#y + dy;
-    Text.validateGeometry(x, y);
-    this.#x = x;
-    this.#y = y;
+    this.updateGeometry(this.#x + dx, this.#y + dy);
+  }
+
+  public override scale(factor: number): void {
+    this.validateScaleFactor(factor);
+    this.updateGeometry(this.#x * factor, this.#y * factor);
   }
 
   public override clone(): Text {
@@ -38,6 +39,22 @@ export class Text extends Shape {
 
   protected override geometryAttributes(): ShapeAttributes {
     return { x: this.#x, y: this.#y };
+  }
+
+  protected override setOwnAttribute(attribute: string, value: string): void {
+    if (attribute === "text") {
+      this.#content = value;
+      return;
+    }
+
+    const geometry = this.updatedGeometry({ x: this.#x, y: this.#y }, attribute, value);
+    this.updateGeometry(geometry.x, geometry.y);
+  }
+
+  private updateGeometry(x: number, y: number): void {
+    Text.validateGeometry(x, y);
+    this.#x = x;
+    this.#y = y;
   }
 
   private static validateGeometry(x: number, y: number): void {

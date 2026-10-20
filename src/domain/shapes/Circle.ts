@@ -6,7 +6,7 @@ import { Style } from "./Style.js";
 export class Circle extends Shape {
   #cx: number;
   #cy: number;
-  readonly #r: number;
+  #r: number;
 
   public constructor(id: string, cx: number, cy: number, r: number, style: Style = new Style()) {
     super(id, style);
@@ -21,11 +21,12 @@ export class Circle extends Shape {
   }
 
   public override move(dx: number, dy: number): void {
-    const cx = this.#cx + dx;
-    const cy = this.#cy + dy;
-    Circle.validateGeometry(cx, cy, this.#r);
-    this.#cx = cx;
-    this.#cy = cy;
+    this.updateGeometry(this.#cx + dx, this.#cy + dy, this.#r);
+  }
+
+  public override scale(factor: number): void {
+    this.validateScaleFactor(factor);
+    this.updateGeometry(this.#cx * factor, this.#cy * factor, this.#r * factor);
   }
 
   public override clone(): Circle {
@@ -34,6 +35,18 @@ export class Circle extends Shape {
 
   protected override geometryAttributes(): ShapeAttributes {
     return { cx: this.#cx, cy: this.#cy, r: this.#r };
+  }
+
+  protected override setOwnAttribute(attribute: string, value: string): void {
+    const geometry = this.updatedGeometry({ cx: this.#cx, cy: this.#cy, r: this.#r }, attribute, value);
+    this.updateGeometry(geometry.cx, geometry.cy, geometry.r);
+  }
+
+  private updateGeometry(cx: number, cy: number, r: number): void {
+    Circle.validateGeometry(cx, cy, r);
+    this.#cx = cx;
+    this.#cy = cy;
+    this.#r = r;
   }
 
   private static validateGeometry(cx: number, cy: number, r: number): void {

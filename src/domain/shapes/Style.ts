@@ -48,12 +48,33 @@ export class Style {
   }
 
   public clone(): Style {
-    return new Style({
+    return new Style(this.options());
+  }
+
+  public withAttribute(attribute: string, value: string): Style {
+    if (attribute === "fill") {
+      return new Style({ ...this.options(), fill: value });
+    }
+    if (attribute === "stroke") {
+      return new Style({ ...this.options(), stroke: value });
+    }
+    if (attribute === "stroke-width") {
+      if (value.trim().length === 0) {
+        throw new DomainError("stroke-width must be a non-negative finite number");
+      }
+      return new Style({ ...this.options(), strokeWidth: Number(value) });
+    }
+
+    throw new DomainError(`unknown attribute: ${attribute}`);
+  }
+
+  private options(): StyleOptions {
+    return {
       ...(this.#fill === undefined ? {} : { fill: this.#fill }),
       ...(this.#stroke === undefined ? {} : { stroke: this.#stroke }),
       ...(this.#strokeWidth === undefined
         ? {}
         : { strokeWidth: this.#strokeWidth }),
-    });
+    };
   }
 }
