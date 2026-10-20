@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output and caches
+/dist/
+/coverage/
+/.nyc_output/
+*.tsbuildinfo
+.eslintcache
+
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Editor and operating system files
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

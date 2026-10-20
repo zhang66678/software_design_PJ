@@ -1,0 +1,18 @@
+@startuml
+title SVG CLI Phase 1 — 模块依赖
+skinparam componentStyle rectangle
+component "bootstrap\n对象组装" as Boot
+component "presentation\nCLI / 格式化" as UI
+component "application\nCommand / History / Ports" as App
+component "domain\nShape / Group / SvgDocument" as Domain
+component "infrastructure\n文件 / XML / 终端适配器" as Infra
+Boot --> UI
+Boot --> App
+Boot --> Infra
+UI --> App
+UI --> Domain
+App --> Domain
+Infra --> App : 实现端口
+Infra --> UI : 实现终端接口
+Infra --> Domain
+@enduml
