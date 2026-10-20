@@ -9,7 +9,7 @@ export class TestEditCommand extends EditCommand {
     this.#action = action;
   }
 
-  public override execute(document: SvgDocument): string {
+  public override apply(document: SvgDocument): string {
     return this.#action(document);
   }
 }

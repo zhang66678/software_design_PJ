@@ -16,7 +16,7 @@ export class CommandExecutor {
   public execute(command: EditCommand): string {
     const before = this.#session.capture();
     const candidate = before.restore();
-    const summary = command.execute(candidate);
+    const summary = command.apply(candidate);
     const after = new DocumentSnapshot(candidate);
     const entry = new HistoryEntry(before, after, summary);
 
