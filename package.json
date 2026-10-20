@@ -10,11 +10,13 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "typecheck": "tsc --project tsconfig.test.json --noEmit",
     "lint": "eslint . --max-warnings=0",
     "precli": "npm run build",
     "cli": "node dist/bootstrap/Main.js",
-    "check": "npm run typecheck && npm run lint && npm run build"
+    "pretest": "tsc --project tsconfig.test.json",
+    "test": "node --test \".test-dist/tests/**/*.test.js\"",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

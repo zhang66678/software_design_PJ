@@ -28,10 +28,11 @@ Windows PowerShell 若限制运行 `npm.ps1`，可以将命令中的 `npm` 换�
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run typecheck` | 类型检查，不生成文件 |
+| `npm run typecheck` | 检查源码和测试的类型，不生成文件 |
 | `npm run lint` | ESLint 静态检查 |
+| `npm test` | 编译并使用 Node.js 内置测试工具运行领域测试 |
 | `npm run build` | 编译到 `dist/` |
-| `npm run check` | 依次执行类型检查、静态检查和构建 |
+| `npm run check` | 依次执行类型检查、静态检查、测试和构建 |
 
 GitHub Actions 在 Windows 和 Linux 上使用 `npm ci` 安装依赖，执行工程检查及 CLI 启动验证。
 
