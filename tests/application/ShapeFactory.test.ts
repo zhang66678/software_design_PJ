@@ -84,12 +84,16 @@ describe("ShapeFactory", () => {
     });
   });
 
-  it("checks circle and ellipse argument counts", () => {
+  it("checks shape-specific argument counts", () => {
     for (const { type, parameters, syntax } of [
       { type: "circle", parameters: ["1", "2"], syntax: "create circle <id> <cx> <cy> <r> [fill]" },
       { type: "circle", parameters: ["1", "2", "3", "red", "extra"], syntax: "create circle <id> <cx> <cy> <r> [fill]" },
       { type: "ellipse", parameters: ["1", "2", "3"], syntax: "create ellipse <id> <cx> <cy> <rx> <ry> [fill]" },
       { type: "ellipse", parameters: ["1", "2", "3", "4", "red", "extra"], syntax: "create ellipse <id> <cx> <cy> <rx> <ry> [fill]" },
+      { type: "line", parameters: ["1", "2", "3"], syntax: "create line <id> <x1> <y1> <x2> <y2> [stroke]" },
+      { type: "line", parameters: ["1", "2", "3", "4", "black", "extra"], syntax: "create line <id> <x1> <y1> <x2> <y2> [stroke]" },
+      { type: "text", parameters: ["1", "2"], syntax: 'create text <id> <x> <y> "content"' },
+      { type: "text", parameters: ["1", "2", "hello", "extra"], syntax: 'create text <id> <x> <y> "content"' },
     ]) {
       assert.throws(() => factory.create(type, "s1", parameters), {
         name: "ApplicationError", message: `usage: ${syntax}`,

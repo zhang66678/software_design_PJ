@@ -131,6 +131,47 @@ describe("CLI entry", () => {
     assert.deepEqual(positions, [60, 59, 60]);
   });
 
+  it("creates, displays, moves and restores lines and text", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init",
+        "create line edge 10 20 50 60 black",
+        "create line plain 0 0 0 0",
+        'create text label 20 40 "  开始 流程  "',
+        'create text empty 0 0 ""',
+        "move edge 5 -2", "move label -5 3",
+        "tree",
+        "undo", "show label",
+        "undo", "show edge",
+        "redo", "redo", "undo",
+        'create text bad 0 nope "invalid"',
+        "redo", "show edge", "show label", "show plain", "show empty",
+        "help",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "error: y must be a finite number\n");
+    for (const output of [
+      "line#edge  x1=15 y1=18 x2=55 y2=58  stroke=black",
+      'text#label  x=15 y=43  "  开始 流程  "',
+      'text#empty  x=0 y=0  ""',
+      'text#label  parent=svg\n  x=20 y=40\n  text="  开始 流程  "\n',
+      "line#edge  parent=svg\n  x1=10 y1=20 x2=50 y2=60\n  stroke=black\n",
+      "line#edge  parent=svg\n  x1=15 y1=18 x2=55 y2=58\n  stroke=black\n",
+      'text#label  parent=svg\n  x=15 y=43\n  text="  开始 流程  "\n',
+      "line#plain  parent=svg\n  x1=0 y1=0 x2=0 y2=0\ntext#empty",
+      'text#empty  parent=svg\n  x=0 y=0\n  text=""\n',
+      "create line <id> <x1> <y1> <x2> <y2> [stroke]",
+      'create text <id> <x> <y> "content"',
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+  });
+
   it("creates, displays, moves and restores circles and ellipses", () => {
     const result = spawnSync(execPath, [entry], {
       input: [

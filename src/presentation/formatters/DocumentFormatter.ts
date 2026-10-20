@@ -23,8 +23,9 @@ export class DocumentFormatter {
     const description = document.getShape(id).describe();
     const lines = [`${description.type}#${description.id}  parent=svg`];
     const geometry = this.attributes(description, false);
+    const content = description.textContent === undefined ? "" : `text=${JSON.stringify(description.textContent)}`;
     const style = this.attributes(description, true);
-    for (const attributes of [geometry, style]) {
+    for (const attributes of [geometry, content, style]) {
       if (attributes.length > 0) {
         lines.push(`  ${attributes}`);
       }
@@ -36,6 +37,7 @@ export class DocumentFormatter {
   private inline(description: ShapeDescription): string {
     const attributes = [
       this.attributes(description, false),
+      description.textContent === undefined ? "" : JSON.stringify(description.textContent),
       this.attributes(description, true),
     ].filter((value) => value.length > 0);
 

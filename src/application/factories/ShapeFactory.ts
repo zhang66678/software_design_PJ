@@ -1,8 +1,10 @@
 import type { Shape } from "../../domain/shapes/Shape.js";
 import { Circle } from "../../domain/shapes/Circle.js";
 import { Ellipse } from "../../domain/shapes/Ellipse.js";
+import { Line } from "../../domain/shapes/Line.js";
 import { Rect } from "../../domain/shapes/Rect.js";
 import { Style } from "../../domain/shapes/Style.js";
+import { Text } from "../../domain/shapes/Text.js";
 import { CommandArguments } from "../arguments/CommandArguments.js";
 import { ApplicationError } from "../errors/ApplicationError.js";
 
@@ -14,6 +16,8 @@ export class ShapeFactory {
     ["rect", (id, parameters) => this.createRect(id, parameters)],
     ["circle", (id, parameters) => this.createCircle(id, parameters)],
     ["ellipse", (id, parameters) => this.createEllipse(id, parameters)],
+    ["line", (id, parameters) => this.createLine(id, parameters)],
+    ["text", (id, parameters) => this.createText(id, parameters)],
   ]);
 
   public create(type: string, id: string, parameters: readonly string[]): Shape {
@@ -69,5 +73,26 @@ export class ShapeFactory {
       args.numberAt(3, "ry"),
       new Style(fill === undefined ? {} : { fill }),
     );
+  }
+
+  private createLine(id: string, parameters: readonly string[]): Line {
+    const args = new CommandArguments(parameters);
+    args.expectCount(4, 5, "create line <id> <x1> <y1> <x2> <y2> [stroke]");
+    const stroke = args.optionalAt(4);
+
+    return new Line(
+      id,
+      args.numberAt(0, "x1"),
+      args.numberAt(1, "y1"),
+      args.numberAt(2, "x2"),
+      args.numberAt(3, "y2"),
+      new Style(stroke === undefined ? {} : { stroke }),
+    );
+  }
+
+  private createText(id: string, parameters: readonly string[]): Text {
+    const args = new CommandArguments(parameters);
+    args.expectCount(3, 3, 'create text <id> <x> <y> "content"');
+    return new Text(id, args.numberAt(0, "x"), args.numberAt(1, "y"), args.stringAt(2, "content"));
   }
 }

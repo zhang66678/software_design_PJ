@@ -1,6 +1,6 @@
 # SVG 编辑器 CLI
 
-软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、移动矩形、圆和椭圆，查看文档结构，并撤销、重做编辑操作。
+软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、移动图形和文字，查看文档结构，并撤销、重做编辑操作。
 
 ## 环境
 
@@ -44,11 +44,13 @@ tree
 
 `move` 使用增量坐标，因此矩形的 x 从 10 变为 40。撤销后 `show r1` 显示 x=10，重做后 `tree` 显示 x=40。
 
-也可以创建圆和椭圆：
+也可以创建其他图形和文字：
 
 ```text
 create circle c1 100 100 20 red
 create ellipse e1 200 100 40 20 #4a90d9
+create line edge 120 100 160 100 black
+create text title 20 40 "我的流程图"
 ```
 
 ## 命令
@@ -59,6 +61,8 @@ create ellipse e1 200 100 40 20 #4a90d9
 | `create rect <id> <x> <y> <w> <h> [fill]` | 创建矩形，id 唯一且区分大小写；省略 fill 时遵循 SVG 默认样式 |
 | `create circle <id> <cx> <cy> <r> [fill]` | 创建圆，指定圆心和半径 |
 | `create ellipse <id> <cx> <cy> <rx> <ry> [fill]` | 创建椭圆，指定中心和两个半轴长度 |
+| `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段，指定两端坐标及可选描边色 |
+| `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
 | `move <id> <dx> <dy>` | 按增量移动图形 |
 | `tree [id]` | 显示文档结构与几何属性，或只显示指定图形 |
 | `show <id>` | 显示图形属性与父节点 |

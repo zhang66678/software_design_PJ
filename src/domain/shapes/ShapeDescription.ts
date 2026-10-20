@@ -4,4 +4,5 @@ export interface ShapeDescription {
   readonly id: string;
   readonly type: string;
   readonly attributes: ShapeAttributes;
+  readonly textContent?: string;
 }
