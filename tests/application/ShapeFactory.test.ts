@@ -83,4 +83,17 @@ describe("ShapeFactory", () => {
       message: "style color must not be empty",
     });
   });
+
+  it("checks circle and ellipse argument counts", () => {
+    for (const { type, parameters, syntax } of [
+      { type: "circle", parameters: ["1", "2"], syntax: "create circle <id> <cx> <cy> <r> [fill]" },
+      { type: "circle", parameters: ["1", "2", "3", "red", "extra"], syntax: "create circle <id> <cx> <cy> <r> [fill]" },
+      { type: "ellipse", parameters: ["1", "2", "3"], syntax: "create ellipse <id> <cx> <cy> <rx> <ry> [fill]" },
+      { type: "ellipse", parameters: ["1", "2", "3", "4", "red", "extra"], syntax: "create ellipse <id> <cx> <cy> <rx> <ry> [fill]" },
+    ]) {
+      assert.throws(() => factory.create(type, "s1", parameters), {
+        name: "ApplicationError", message: `usage: ${syntax}`,
+      });
+    }
+  });
 });

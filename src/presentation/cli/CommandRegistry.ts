@@ -38,7 +38,7 @@ export class CommandRegistry {
         },
       }],
       ["create", {
-        syntax: "create rect <id> <x> <y> <w> <h> [fill]",
+        syntax: "create <type> <id> [params...]",
         create: (args, syntax) => {
           args.expectCount(2, Infinity, syntax);
           return new CreateCommand(factory, args.stringAt(0, "type"), args.stringAt(1, "id"), args.slice(2));
@@ -103,7 +103,14 @@ export class CommandRegistry {
   }
 
   public help(): string {
-    return ["Commands:", ...[...this.#definitions.values()].map((definition) => `  ${definition.syntax}`)]
-      .join("\n");
+    return [
+      "Commands:",
+      ...[...this.#definitions.values()].map((definition) => `  ${definition.syntax}`),
+      "",
+      "Shape creation:",
+      "  create rect <id> <x> <y> <w> <h> [fill]",
+      "  create circle <id> <cx> <cy> <r> [fill]",
+      "  create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
+    ].join("\n");
   }
 }

@@ -130,4 +130,44 @@ describe("CLI entry", () => {
       .map((match) => Number(match[1]));
     assert.deepEqual(positions, [60, 59, 60]);
   });
+
+  it("creates, displays, moves and restores circles and ellipses", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init",
+        "create circle c1 10.5 20.25 8.5 red",
+        "create ellipse e1 -5 7.25 30 12.5",
+        "move c1 2 -0.25",
+        "move e1 -0.5 3",
+        "tree",
+        "undo", "show e1",
+        "undo", "show c1",
+        "redo", "redo",
+        "undo",
+        "create circle bad 0 0 -1",
+        "redo", "show c1", "show e1",
+        "help",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "error: circle radius must be non-negative\n");
+    for (const output of [
+      "circle#c1 created",
+      "ellipse#e1 created",
+      "├── circle#c1  cx=12.5 cy=20 r=8.5  fill=red",
+      "└── ellipse#e1  cx=-5.5 cy=10.25 rx=30 ry=12.5",
+      "circle#c1  parent=svg\n  cx=10.5 cy=20.25 r=8.5\n  fill=red\n",
+      "ellipse#e1  parent=svg\n  cx=-5 cy=7.25 rx=30 ry=12.5\n",
+      "circle#c1  parent=svg\n  cx=12.5 cy=20 r=8.5\n  fill=red\n",
+      "ellipse#e1  parent=svg\n  cx=-5.5 cy=10.25 rx=30 ry=12.5\n",
+      "create circle <id> <cx> <cy> <r> [fill]",
+      "create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+  });
 });

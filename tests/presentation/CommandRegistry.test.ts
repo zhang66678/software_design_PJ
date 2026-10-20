@@ -24,13 +24,18 @@ describe("CommandRegistry", () => {
     assert.equal(run("help"), [
       "Commands:",
       "  init [w] [h]",
-      "  create rect <id> <x> <y> <w> <h> [fill]",
+      "  create <type> <id> [params...]",
       "  move <id> <dx> <dy>",
       "  tree [id]",
       "  show <id>",
       "  help",
       "  undo",
       "  redo",
+      "",
+      "Shape creation:",
+      "  create rect <id> <x> <y> <w> <h> [fill]",
+      "  create circle <id> <cx> <cy> <r> [fill]",
+      "  create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
     ].join("\n"));
   });
 
