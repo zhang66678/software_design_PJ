@@ -32,4 +32,4 @@ jobs:
         run: npm run check
 
       - name: Start CLI
-        run: npm run cli
+        run: echo help | npm run cli

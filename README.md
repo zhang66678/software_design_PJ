@@ -1,6 +1,6 @@
 # SVG 编辑器 CLI
 
-软件设计课程项目，使用 TypeScript 和 Node.js。
+软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、移动矩形，查看文档结构，并撤销、重做编辑操作。
 
 ## 环境
 
@@ -16,13 +16,50 @@ npm ci
 npm run cli
 ```
 
-启动命令会先编译 TypeScript，再运行程序入口，输出：
+启动命令会先编译 TypeScript，再进入交互终端：
 
 ```text
-svg-editor 0.1.0
+svg-editor 0.1.0 — type 'help' for commands
+svg>
 ```
 
 Windows PowerShell 若限制运行 `npm.ps1`，可以将命令中的 `npm` 换成 `npm.cmd`。
+
+输入 `help` 查看命令，按 `Ctrl+C` 退出。
+
+## 使用示例
+
+启动后逐行输入：
+
+```text
+init 800 600
+create rect r1 10 20 100 50 #4a90d9
+move r1 30 0
+tree
+undo
+show r1
+redo
+tree
+```
+
+`move` 使用增量坐标，因此矩形的 x 从 10 变为 40。撤销后 `show r1` 显示 x=10，重做后 `tree` 显示 x=40。
+
+## 命令
+
+| 语法 | 用途 |
+| --- | --- |
+| `init [w] [h]` | 新建画布，默认 800×600；清除原文档和历史记录 |
+| `create rect <id> <x> <y> <w> <h> [fill]` | 创建矩形，id 唯一且区分大小写；省略 fill 时遵循 SVG 默认样式 |
+| `move <id> <dx> <dy>` | 按增量移动图形 |
+| `tree [id]` | 显示文档结构与几何属性，或只显示指定图形 |
+| `show <id>` | 显示图形属性与父节点 |
+| `help` | 显示命令语法 |
+| `undo` | 撤销上一条编辑 |
+| `redo` | 重做被撤销的编辑 |
+
+整行以 `#` 开头时作为注释；颜色中的 `#` 会保留。带空格的参数用双引号包裹，例如 `"rgb(255, 0, 0)"`。编辑失败时输出一行以 `error:` 开头的信息，并保留文档与历史，随后可以继续输入命令。
+
+`tree`、`show` 和 `help` 不改变编辑历史。成功新建画布后禁止撤销、重做，下一次成功编辑开始新的历史；撤销后执行新的编辑会清空重做记录。
 
 ## 开发检查
 
@@ -30,7 +67,7 @@ Windows PowerShell 若限制运行 `npm.ps1`，可以将命令中的 `npm` 换�
 | --- | --- |
 | `npm run typecheck` | 检查源码和测试的类型，不生成文件 |
 | `npm run lint` | ESLint 静态检查 |
-| `npm test` | 编译并使用 Node.js 内置测试工具运行领域和应用层测试 |
+| `npm test` | 编译并运行自动化测试，包含 CLI 真实入口测试 |
 | `npm run build` | 编译到 `dist/` |
 | `npm run check` | 依次执行类型检查、静态检查、测试和构建 |
 

@@ -30,4 +30,17 @@ export class CommandArguments {
   public optionalAt(index: number): string | undefined {
     return this.#values[index];
   }
+
+  public stringAt(index: number, name: string): string {
+    const value = this.#values[index];
+    if (value === undefined) {
+      throw new ApplicationError(`${name} is required`);
+    }
+
+    return value;
+  }
+
+  public slice(start: number): readonly string[] {
+    return this.#values.slice(start);
+  }
 }
