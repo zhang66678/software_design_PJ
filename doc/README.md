@@ -57,3 +57,15 @@ Infra --> Domain
 | 增加图形类型 | 集中创建入口，通过多态完成图形行为 |
 | 增加 GUI 或其他输入方式 | 命令对象与终端输入分离 |
 | 更换 SVG 解析库或存储方式 | 用 IO 接口隔离具体实现 |
+
+### 5. 工程工具
+
+运行环境采用 Node.js 24。TypeScript 使用严格类型检查，以 NodeNext 模块规则编译为原生 ESM；ESLint 使用 [typescript-eslint 推荐配置](https://typescript-eslint.io/getting-started/)，并约束一类一文件及成员的显式访问修饰符。
+
+依赖版本由 `package-lock.json` 锁定，使用 `npm ci` 安装。`src/bootstrap/Main.ts` 为程序入口，`npm run cli` 通过 `precli` 自动构建后启动。
+
+## 质量保证手段
+
+`npm run check` 依次执行类型检查、ESLint 静态检查和编译构建，任一检查失败即停止。
+
+CI 工作流覆盖 Windows 和 Linux，执行 `npm ci`、`npm run check` 和 `npm run cli`，使依赖安装、检查和程序启动使用统一入口。
