@@ -40,10 +40,16 @@ export class CommandRegistry {
         },
       }],
       ["create", {
-        syntax: "create <type> <id> [params...]",
+        syntax: "create <type> <id> [params...] [in <containerId>]",
         create: (args, syntax) => {
           args.expectCount(2, Infinity, syntax);
-          return new CreateCommand(factory, args.stringAt(0, "type"), args.stringAt(1, "id"), args.slice(2));
+          let parameters = args.slice(2);
+          let containerId: string | undefined;
+          if (parameters.at(-2) === "in") {
+            containerId = parameters.at(-1);
+            parameters = parameters.slice(0, -2);
+          }
+          return new CreateCommand(factory, args.stringAt(0, "type"), args.stringAt(1, "id"), parameters, containerId);
         },
       }],
       ["move", {
@@ -129,6 +135,8 @@ export class CommandRegistry {
       "  create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
       "  create line <id> <x1> <y1> <x2> <y2> [stroke]",
       '  create text <id> <x> <y> "content"',
+      "  create g <id>",
+      "  All types support the suffix: in <containerId>",
     ].join("\n");
   }
 }

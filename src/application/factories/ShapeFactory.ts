@@ -1,6 +1,7 @@
 import type { Shape } from "../../domain/shapes/Shape.js";
 import { Circle } from "../../domain/shapes/Circle.js";
 import { Ellipse } from "../../domain/shapes/Ellipse.js";
+import { Group } from "../../domain/shapes/Group.js";
 import { Line } from "../../domain/shapes/Line.js";
 import { Rect } from "../../domain/shapes/Rect.js";
 import { Style } from "../../domain/shapes/Style.js";
@@ -18,6 +19,7 @@ export class ShapeFactory {
     ["ellipse", (id, parameters) => this.createEllipse(id, parameters)],
     ["line", (id, parameters) => this.createLine(id, parameters)],
     ["text", (id, parameters) => this.createText(id, parameters)],
+    ["g", (id, parameters) => this.createGroup(id, parameters)],
   ]);
 
   public create(type: string, id: string, parameters: readonly string[]): Shape {
@@ -94,5 +96,10 @@ export class ShapeFactory {
     const args = new CommandArguments(parameters);
     args.expectCount(3, 3, 'create text <id> <x> <y> "content"');
     return new Text(id, args.numberAt(0, "x"), args.numberAt(1, "y"), args.stringAt(2, "content"));
+  }
+
+  private createGroup(id: string, parameters: readonly string[]): Group {
+    new CommandArguments(parameters).expectCount(0, 0, "create g <id>");
+    return new Group(id);
   }
 }

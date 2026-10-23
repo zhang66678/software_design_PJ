@@ -7,23 +7,28 @@ export class CreateCommand extends EditCommand {
   readonly #type: string;
   readonly #id: string;
   readonly #parameters: readonly string[];
+  readonly #containerId: string | undefined;
 
   public constructor(
     factory: ShapeFactory,
     type: string,
     id: string,
     parameters: readonly string[],
+    containerId?: string,
   ) {
     super();
     this.#factory = factory;
     this.#type = type;
     this.#id = id;
     this.#parameters = [...parameters];
+    this.#containerId = containerId;
   }
 
   public override apply(document: SvgDocument): string {
     const shape = this.#factory.create(this.#type, this.#id, this.#parameters);
-    document.add(shape);
-    return `${shape.type}#${shape.id} created`;
+    document.add(shape, this.#containerId);
+    const parent = document.getParent(shape.id);
+    const placement = parent === undefined ? "" : ` in ${parent.type}#${parent.id}`;
+    return `${shape.type}#${shape.id} created${placement}`;
   }
 }

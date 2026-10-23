@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
+import { Group } from "../../src/domain/shapes/Group.js";
 import { Rect } from "../../src/domain/shapes/Rect.js";
 import { Style } from "../../src/domain/shapes/Style.js";
+import { Text } from "../../src/domain/shapes/Text.js";
 import { DocumentFormatter } from "../../src/presentation/formatters/DocumentFormatter.js";
 
 describe("DocumentFormatter", () => {
@@ -59,5 +61,34 @@ describe("DocumentFormatter", () => {
     const document = new SvgDocument();
     assert.throws(() => formatter.tree(document, "missing"), { message: "no such shape: missing" });
     assert.throws(() => formatter.show(document, "missing"), { message: "no such shape: missing" });
+  });
+
+  it("renders nested branches, selected subtrees, empty groups and real parents", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [
+      new Group("node", [new Text("label", 10, 20, "开始")], new Style({ fill: "red" })),
+      new Group("empty"),
+    ]));
+    document.add(new Rect("outside", 0, 0, 1, 1));
+    const subtree = [
+      "g#outer",
+      "├── g#node  fill=red",
+      '│   └── text#label  x=10 y=20  "开始"',
+      "└── g#empty",
+    ].join("\n");
+
+    assert.equal(formatter.tree(document, "outer"), subtree);
+    assert.equal(formatter.tree(document), [
+      "svg (800x600)",
+      "├── g#outer",
+      "│   ├── g#node  fill=red",
+      '│   │   └── text#label  x=10 y=20  "开始"',
+      "│   └── g#empty",
+      "└── rect#outside  x=0 y=0 width=1 height=1",
+    ].join("\n"));
+    assert.equal(formatter.tree(document, "empty"), "g#empty");
+    assert.equal(formatter.show(document, "label"), 'text#label  parent=g#node\n  x=10 y=20\n  text="开始"');
+    assert.equal(formatter.show(document, "node"), "g#node  parent=g#outer\n  fill=red");
+    assert.equal(formatter.show(document, "outer"), "g#outer  parent=svg");
   });
 });

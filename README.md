@@ -1,6 +1,6 @@
 # SVG 编辑器 CLI
 
-软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、移动图形和文字，查看文档结构，并撤销、重做编辑操作。
+软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、编辑图形、文字及嵌套容器，查看文档结构，并撤销、重做编辑操作。
 
 ## 环境
 
@@ -63,6 +63,22 @@ set title text "流程图 v2"
 show r1
 ```
 
+创建容器并直接指定图形归属：
+
+```text
+init 800 600
+create g flowchart
+create g node1 in flowchart
+create rect start 120 100 160 60 #4a90d9 in node1
+create text start-label 155 135 "开始" in node1
+move node1 0 100
+tree flowchart
+show start-label
+undo
+```
+
+移动或缩放容器会递归作用于全部后代，一次操作对应一个撤销单元。`tree <id>` 显示指定图形及其完整子树，`show` 显示真实父级。
+
 ## 命令
 
 | 语法 | 用途 |
@@ -73,14 +89,17 @@ show r1
 | `create ellipse <id> <cx> <cy> <rx> <ry> [fill]` | 创建椭圆，指定中心和两个半轴长度 |
 | `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段，指定两端坐标及可选描边色 |
 | `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
-| `move <id> <dx> <dy>` | 按增量移动图形 |
+| `create g <id>` | 创建空容器，可继续嵌套容器或图形 |
+| `move <id> <dx> <dy>` | 按增量移动图形或整棵子树 |
 | `scale <id> <factor>` | 按正有限因子同时缩放位置和尺寸 |
 | `set <id> <attr> <value>` | 修改几何属性、公共样式或文字内容 |
-| `tree [id]` | 显示文档结构与几何属性，或只显示指定图形 |
+| `tree [id]` | 显示文档结构与几何属性，或显示指定图形的完整子树 |
 | `show <id>` | 显示图形属性与父节点 |
 | `help` | 显示命令语法 |
 | `undo` | 撤销上一条编辑 |
 | `redo` | 重做被撤销的编辑 |
+
+所有类型的 `create` 都支持尾缀 `in <containerId>`，将新图形加入已存在容器的末尾；省略时创建在画布根级。目标不存在或为叶子图形时会报错。
 
 整行以 `#` 开头时作为注释；颜色中的 `#` 会保留。带空格的参数用双引号包裹，例如 `"rgb(255, 0, 0)"`。编辑失败时输出一行以 `error:` 开头的信息，并保留文档与历史，随后可以继续输入命令。
 

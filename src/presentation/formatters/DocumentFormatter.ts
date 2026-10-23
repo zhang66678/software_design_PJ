@@ -1,4 +1,5 @@
 import type { SvgDocument } from "../../domain/document/SvgDocument.js";
+import type { Shape } from "../../domain/shapes/Shape.js";
 import type { ShapeDescription } from "../../domain/shapes/ShapeDescription.js";
 
 export class DocumentFormatter {
@@ -6,22 +7,18 @@ export class DocumentFormatter {
 
   public tree(document: SvgDocument, id?: string): string {
     if (id !== undefined) {
-      return this.inline(document.getShape(id).describe());
+      const shape = document.getShape(id);
+      return [this.inline(shape.describe()), ...this.branches(shape.getChildren())].join("\n");
     }
 
-    const lines = [`svg (${document.width}x${document.height})`];
-    const shapes = document.getShapes();
-    for (const [index, shape] of shapes.entries()) {
-      const branch = index === shapes.length - 1 ? "└── " : "├── ";
-      lines.push(`${branch}${this.inline(shape.describe())}`);
-    }
-
-    return lines.join("\n");
+    return [`svg (${document.width}x${document.height})`, ...this.branches(document.getShapes())].join("\n");
   }
 
   public show(document: SvgDocument, id: string): string {
     const description = document.getShape(id).describe();
-    const lines = [`${description.type}#${description.id}  parent=svg`];
+    const parent = document.getParent(id);
+    const parentLabel = parent === undefined ? "svg" : `${parent.type}#${parent.id}`;
+    const lines = [`${description.type}#${description.id}  parent=${parentLabel}`];
     const geometry = this.attributes(description, false);
     const content = description.textContent === undefined ? "" : `text=${JSON.stringify(description.textContent)}`;
     const style = this.attributes(description, true);
@@ -32,6 +29,17 @@ export class DocumentFormatter {
     }
 
     return lines.join("\n");
+  }
+
+  private branches(shapes: readonly Shape[], prefix = ""): string[] {
+    const lines: string[] = [];
+    for (const [index, shape] of shapes.entries()) {
+      const last = index === shapes.length - 1;
+      lines.push(`${prefix}${last ? "└── " : "├── "}${this.inline(shape.describe())}`);
+      lines.push(...this.branches(shape.getChildren(), `${prefix}${last ? "    " : "│   "}`));
+    }
+
+    return lines;
   }
 
   private inline(description: ShapeDescription): string {

@@ -24,7 +24,7 @@ describe("CommandRegistry", () => {
     assert.equal(run("help"), [
       "Commands:",
       "  init [w] [h]",
-      "  create <type> <id> [params...]",
+      "  create <type> <id> [params...] [in <containerId>]",
       "  move <id> <dx> <dy>",
       "  scale <id> <factor>",
       "  set <id> <attr> <value>",
@@ -40,6 +40,8 @@ describe("CommandRegistry", () => {
       "  create ellipse <id> <cx> <cy> <rx> <ry> [fill]",
       "  create line <id> <x1> <y1> <x2> <y2> [stroke]",
       '  create text <id> <x> <y> "content"',
+      "  create g <id>",
+      "  All types support the suffix: in <containerId>",
     ].join("\n"));
   });
 
@@ -106,6 +108,68 @@ describe("CommandRegistry", () => {
       assert.throws(() => run(line));
     }
 
+    run("redo");
+    assert.equal(session.getDocument().getShape("r1").describe().attributes.x, 40);
+  });
+
+  it("creates all six types in a container and restores creation as one undo unit", () => {
+    run("init");
+    assert.equal(run("create g scene"), "g#scene created");
+    for (const { type, id, parameters } of [
+      { type: "g", id: "node", parameters: "" },
+      { type: "rect", id: "r1", parameters: "1 2 3 4 red" },
+      { type: "circle", id: "c1", parameters: "1 2 3" },
+      { type: "ellipse", id: "e1", parameters: "1 2 3 4" },
+      { type: "line", id: "edge", parameters: "1 2 3 4 black" },
+      { type: "text", id: "label", parameters: '1 2 "开始"' },
+    ]) {
+      assert.equal(run(`create ${type} ${id} ${parameters} in scene`), `${type}#${id} created in g#scene`);
+      assert.equal(session.getDocument().getParent(id)?.id, "scene");
+    }
+    run("undo");
+    assert.throws(() => session.getDocument().getShape("label"), { message: "no such shape: label" });
+    run("redo");
+    assert.deepEqual(session.getDocument().getShape("scene").getChildren().map((shape) => shape.id),
+      ["node", "r1", "c1", "e1", "edge", "label"]);
+  });
+
+  it("preserves literal in text, empty text and a container named in", () => {
+    run("init");
+    run("create g in");
+    run('create text root 1 2 "in"');
+    run('create text nested 1 2 "in" in in');
+    run('create text spaced 1 2 "in in" in in');
+    run('create text empty 1 2 "" in in');
+
+    const document = session.getDocument();
+    assert.equal(document.getParent("root"), undefined);
+    assert.equal(document.getShape("root").describe().textContent, "in");
+    assert.equal(document.getShape("nested").describe().textContent, "in");
+    assert.equal(document.getParent("nested")?.id, "in");
+    assert.equal(document.getShape("spaced").describe().textContent, "in in");
+    assert.equal(document.getShape("empty").describe().textContent, "");
+  });
+
+  it("keeps the complete tree and redo after invalid container creations", () => {
+    run("init");
+    run("create g scene");
+    run("create rect r1 10 20 30 40 in scene");
+    run("move r1 30 0");
+    run("undo");
+    const before = run("tree");
+
+    for (const { line, message } of [
+      { line: "create g bad in missing", message: "no such container: missing" },
+      { line: "create g bad in r1", message: "not a container: r1" },
+      { line: "create rect r1 0 0 1 1", message: "id already exists: r1" },
+      { line: "create g scene in scene", message: "id already exists: scene" },
+      { line: "create g bad extra in scene", message: "usage: create g <id>" },
+      { line: "create g bad in", message: "usage: create g <id>" },
+      { line: "create text bad 0 0 in scene", message: 'usage: create text <id> <x> <y> "content"' },
+    ]) {
+      assert.throws(() => run(line), { message });
+      assert.equal(run("tree"), before);
+    }
     run("redo");
     assert.equal(session.getDocument().getShape("r1").describe().attributes.x, 40);
   });

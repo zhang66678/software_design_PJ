@@ -25,6 +25,15 @@ describe("ShapeFactory", () => {
     });
   });
 
+  it("creates an empty group and rejects unexpected group parameters", () => {
+    const group = factory.create("g", "scene", []);
+
+    assert.equal(group.isContainer, true);
+    assert.deepEqual(group.describe(), { id: "scene", type: "g", attributes: {} });
+    assert.deepEqual(group.getChildren(), []);
+    assert.throws(() => factory.create("g", "bad", ["extra"]), { message: "usage: create g <id>" });
+  });
+
   for (const type of ["hexagon", "box", "Rect"]) {
     it(`rejects unregistered type ${type}`, () => {
       assert.throws(() => factory.create(type, "r1", ["0", "0", "1", "1"]), {

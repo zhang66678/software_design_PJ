@@ -7,6 +7,55 @@ import { fileURLToPath } from "node:url";
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
 
+  it("builds the two-node flowchart and edits nested containers through the real CLI", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init 800 600",
+        "create g flowchart",
+        "create g node1 in flowchart",
+        "create rect start 120 100 160 60 #4a90d9 in node1",
+        'create text start-label 155 135 "开始" in node1',
+        "create g node2 in flowchart",
+        "create rect process 520 100 160 60 #f5a623 in node2",
+        'create text process-label 545 135 "处理数据" in node2',
+        "create line arrow1 280 130 520 130 black in flowchart",
+        "tree flowchart",
+        "move node2 0 100", "show process",
+        "undo", "show process", "redo",
+        "scale node2 0.5", "show process", "undo",
+        'set process-label text "处理数据 v2"', "show process-label",
+        "undo", "show process-label",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, "");
+    assert.ok(result.stdout.includes([
+      "g#flowchart",
+      "├── g#node1",
+      "│   ├── rect#start  x=120 y=100 width=160 height=60  fill=#4a90d9",
+      '│   └── text#start-label  x=155 y=135  "开始"',
+      "├── g#node2",
+      "│   ├── rect#process  x=520 y=100 width=160 height=60  fill=#f5a623",
+      '│   └── text#process-label  x=545 y=135  "处理数据"',
+      "└── line#arrow1  x1=280 y1=130 x2=520 y2=130  stroke=black",
+    ].join("\n")));
+    for (const output of [
+      "g#node2 created in g#flowchart",
+      "text#process-label created in g#node2",
+      "rect#process  parent=g#node2\n  x=520 y=200 width=160 height=60",
+      "rect#process  parent=g#node2\n  x=520 y=100 width=160 height=60",
+      "rect#process  parent=g#node2\n  x=260 y=100 width=80 height=30",
+      'text="处理数据 v2"',
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+    assert.ok(result.stdout.endsWith('text#process-label  parent=g#node2\n  x=545 y=235\n  text="处理数据"\n'));
+  });
+
   it("runs the rectangle workflow through the real entry and exits at EOF", () => {
     const result = spawnSync(execPath, [entry], {
       input: [
