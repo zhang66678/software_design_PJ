@@ -3,6 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 import { CommandExecutor } from "../../src/application/commands/CommandExecutor.js";
 import { EditorSession } from "../../src/application/session/EditorSession.js";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
+import { Group } from "../../src/domain/shapes/Group.js";
 import { Rect } from "../../src/domain/shapes/Rect.js";
 import { Style } from "../../src/domain/shapes/Style.js";
 import { TestEditCommand } from "../support/TestEditCommand.js";
@@ -393,5 +394,32 @@ describe("CommandExecutor", () => {
     assert.equal(current.getShape("r1").describe().attributes.x, 10);
     assert.equal(executor.redo(), "redone: successful edit");
     assert.equal(session.getDocument().getShape("r1").describe().attributes.x, 40);
+  });
+
+  it("restores nested edits as one undo unit and preserves redo after subtree overflow", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [
+      new Rect("first", 1, 2, 3, 4),
+      new Group("inner", [new Rect("last", 5, 6, Number.MAX_VALUE, 8)]),
+    ]));
+    executor.replaceDocument(document);
+    executor.execute(new TestEditCommand((candidate) => {
+      candidate.getShape("outer").move(10, 20);
+      return "move subtree";
+    }));
+    executor.undo();
+
+    assert.throws(() => executor.execute(new TestEditCommand((candidate) => {
+      candidate.getShape("outer").scale(2);
+      return "unreachable";
+    })), { message: "rectangle geometry must be finite" });
+    assert.deepEqual(session.getDocument().getShape("first").describe().attributes, { x: 1, y: 2, width: 3, height: 4 });
+    executor.redo();
+    assert.equal(session.getDocument().getShape("first").describe().attributes.x, 11);
+    assert.equal(session.getDocument().getShape("last").describe().attributes.y, 26);
+    assert.equal(session.getDocument().getParent("last")?.id, "inner");
+    executor.undo();
+    assert.equal(session.getDocument().getShape("last").describe().attributes.y, 6);
+    assert.throws(() => executor.undo(), { message: "nothing to undo" });
   });
 });

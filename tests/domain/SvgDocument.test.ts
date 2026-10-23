@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { DomainError } from "../../src/domain/errors/DomainError.js";
+import { Group } from "../../src/domain/shapes/Group.js";
 import { Rect } from "../../src/domain/shapes/Rect.js";
 import { Style } from "../../src/domain/shapes/Style.js";
 
@@ -137,5 +138,81 @@ describe("SvgDocument", () => {
     });
     assert.equal(document.getShapes().length, 1);
     assert.equal(copy.getShapes().length, 2);
+  });
+
+  it("resolves nested shapes and their current parents after attaching children", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [new Group("inner")]));
+    const rect = new Rect("r1", 1, 2, 3, 4);
+    document.add(rect, "inner");
+    document.add(new Rect("R1", 0, 0, 1, 1), "outer");
+
+    assert.equal(document.getShape("r1"), rect);
+    assert.equal(document.getParent("outer"), undefined);
+    assert.equal(document.getParent("inner"), document.getShape("outer"));
+    assert.equal(document.getParent("r1"), document.getShape("inner"));
+    assert.equal(document.getContainer("inner"), document.getShape("inner"));
+    assert.deepEqual([...document.getShape("outer").walk()].map((shape) => shape.id), ["outer", "inner", "r1", "R1"]);
+    assert.throws(() => document.getParent("missing"), { message: "no such shape: missing" });
+  });
+
+  it("checks every incoming id against the entire document before attaching", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [new Group("inner", [new Rect("r1", 1, 2, 3, 4)])]));
+    document.add(new Group("other"));
+    const roots = document.getShapes();
+
+    for (const candidate of [new Rect("r1", 0, 0, 1, 1), new Group("new", [new Rect("r1", 0, 0, 1, 1)])]) {
+      assert.throws(() => document.add(candidate), { message: "id already exists: r1" });
+      assert.throws(() => document.add(candidate, "other"), { message: "id already exists: r1" });
+    }
+    assert.throws(() => document.add(document.getShape("outer"), "inner"), { message: "id already exists: outer" });
+    assert.deepEqual(document.getShapes(), roots);
+    assert.deepEqual(document.getShape("other").getChildren(), []);
+  });
+
+  it("rejects missing containers and leaf targets without changing the tree", () => {
+    const document = new SvgDocument();
+    const rect = new Rect("r1", 0, 0, 1, 1);
+    document.add(rect);
+
+    assert.throws(() => document.add(new Group("g1"), "missing"), { message: "no such container: missing" });
+    assert.throws(() => document.add(new Group("g1"), "r1"), { message: "not a container: r1" });
+    assert.deepEqual(document.getShapes(), [rect]);
+  });
+
+  it("detaches complete subtrees and permits reattaching them at another parent", () => {
+    const document = new SvgDocument();
+    document.add(new Rect("before", 0, 0, 1, 1));
+    document.add(new Group("outer", [
+      new Group("inner", [new Rect("r1", 1, 2, 3, 4)]),
+      new Rect("r2", 5, 6, 7, 8),
+    ]));
+    document.add(new Group("target"));
+    const detached = document.remove("inner");
+
+    assert.deepEqual(document.getShape("outer").getChildren().map((shape) => shape.id), ["r2"]);
+    assert.throws(() => document.getShape("r1"), { message: "no such shape: r1" });
+    assert.throws(() => document.remove("inner"), { message: "no such shape: inner" });
+    document.add(detached, "target");
+    assert.equal(document.getShape("inner"), detached);
+    assert.equal(document.getParent("inner"), document.getShape("target"));
+    assert.equal(document.getParent("r1"), detached);
+
+    document.remove("outer");
+    assert.deepEqual(document.getShapes().map((shape) => shape.id), ["before", "target"]);
+    assert.throws(() => document.getShape("r2"), { message: "no such shape: r2" });
+  });
+
+  it("keeps document structure valid when a new group is derived from a returned group", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [new Rect("r1", 0, 0, 1, 1)]));
+    document.add(new Rect("r2", 0, 0, 1, 1));
+    const derived = document.getContainer("outer").withChildren([document.getShape("r2")]);
+
+    assert.deepEqual(derived.getChildren().map((shape) => shape.id), ["r2"]);
+    assert.equal(document.getParent("r1"), document.getShape("outer"));
+    assert.equal(document.getParent("r2"), undefined);
+    assert.deepEqual(document.getShape("outer").getChildren().map((shape) => shape.id), ["r1"]);
   });
 });

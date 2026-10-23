@@ -27,6 +27,29 @@ export abstract class Shape {
 
   public abstract get type(): string;
 
+  public get isContainer(): boolean {
+    return false;
+  }
+
+  public getChildren(): readonly Shape[] {
+    return Object.freeze([]);
+  }
+
+  public withChildren(children: readonly Shape[]): Shape {
+    if (children.length > 0) {
+      throw new DomainError(`not a container: ${this.id}`);
+    }
+
+    return this.clone();
+  }
+
+  public *walk(): IterableIterator<Shape> {
+    yield this;
+    for (const child of this.getChildren()) {
+      yield* child.walk();
+    }
+  }
+
   public abstract move(dx: number, dy: number): void;
 
   public abstract scale(factor: number): void;
