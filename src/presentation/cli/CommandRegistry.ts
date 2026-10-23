@@ -1,6 +1,8 @@
 import { CommandArguments } from "../../application/arguments/CommandArguments.js";
+import { AddToCommand } from "../../application/commands/AddToCommand.js";
 import type { Command } from "../../application/commands/Command.js";
 import { CreateCommand } from "../../application/commands/CreateCommand.js";
+import { DeleteCommand } from "../../application/commands/DeleteCommand.js";
 import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
 import { RedoCommand } from "../../application/commands/RedoCommand.js";
@@ -50,6 +52,20 @@ export class CommandRegistry {
             parameters = parameters.slice(0, -2);
           }
           return new CreateCommand(factory, args.stringAt(0, "type"), args.stringAt(1, "id"), parameters, containerId);
+        },
+      }],
+      ["delete", {
+        syntax: "delete <id>",
+        create: (args, syntax) => {
+          args.expectCount(1, 1, syntax);
+          return new DeleteCommand(args.stringAt(0, "id"));
+        },
+      }],
+      ["addto", {
+        syntax: "addto <gid> <id>",
+        create: (args, syntax) => {
+          args.expectCount(2, 2, syntax);
+          return new AddToCommand(args.stringAt(0, "container id"), args.stringAt(1, "id"));
         },
       }],
       ["move", {

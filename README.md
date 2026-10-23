@@ -79,6 +79,18 @@ undo
 
 移动或缩放容器会递归作用于全部后代，一次操作对应一个撤销单元。`tree <id>` 显示指定图形及其完整子树，`show` 显示真实父级。
 
+在上面的文档中，可以继续迁移已有节点或删除子树：
+
+```text
+create g archive
+addto archive node1
+delete node1
+undo
+undo
+```
+
+`addto` 将图形或容器移到目标容器的末尾，保留子树、几何和显式样式；目标是当前父级时调整到同级末尾。容器不能迁入自身或后代。`delete` 删除目标及全部后代，撤销时恢复原父级、顺序和内容。
+
 ## 命令
 
 | 语法 | 用途 |
@@ -90,6 +102,8 @@ undo
 | `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段，指定两端坐标及可选描边色 |
 | `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
 | `create g <id>` | 创建空容器，可继续嵌套容器或图形 |
+| `delete <id>` | 删除图形或完整子树 |
+| `addto <gid> <id>` | 将已有图形或子树迁入目标容器末尾 |
 | `move <id> <dx> <dy>` | 按增量移动图形或整棵子树 |
 | `scale <id> <factor>` | 按正有限因子同时缩放位置和尺寸 |
 | `set <id> <attr> <value>` | 修改几何属性、公共样式或文字内容 |

@@ -215,4 +215,54 @@ describe("SvgDocument", () => {
     assert.equal(document.getParent("r2"), undefined);
     assert.deepEqual(document.getShape("outer").getChildren().map((shape) => shape.id), ["r1"]);
   });
+
+  it("moves root nodes and complete subtrees to the end of another container", () => {
+    const document = new SvgDocument();
+    document.add(new Group("source", [new Group("node", [new Rect("r1", 1, 2, 3, 4)])]));
+    document.add(new Group("target", [new Rect("existing", 0, 0, 1, 1)]));
+    document.add(new Rect("loose", 5, 6, 7, 8, new Style({ fill: "red" })));
+    const node = document.getShape("node");
+    const loose = document.getShape("loose");
+
+    assert.equal(document.addTo("target", "node"), node);
+    assert.equal(document.addTo("target", "loose"), loose);
+    assert.deepEqual(document.getShape("source").getChildren(), []);
+    assert.deepEqual(document.getShape("target").getChildren().map((shape) => shape.id), ["existing", "node", "loose"]);
+    assert.deepEqual(document.getShapes().map((shape) => shape.id), ["source", "target"]);
+    assert.equal(document.getParent("r1"), node);
+    assert.deepEqual(loose.describe().attributes, { x: 5, y: 6, width: 7, height: 8, fill: "red" });
+  });
+
+  it("uses the updated ancestor when moving to an ancestor or the same parent", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [
+      new Group("inner", [new Rect("r1", 1, 2, 3, 4)]),
+      new Rect("r2", 5, 6, 7, 8),
+    ]));
+
+    document.addTo("outer", "r1");
+    assert.deepEqual(document.getShape("outer").getChildren().map((shape) => shape.id), ["inner", "r2", "r1"]);
+    assert.deepEqual(document.getShape("inner").getChildren(), []);
+    document.addTo("outer", "inner");
+    assert.deepEqual(document.getShape("outer").getChildren().map((shape) => shape.id), ["r2", "r1", "inner"]);
+    assert.equal([...document.getShape("outer").walk()].filter((shape) => shape.id === "r1").length, 1);
+  });
+
+  it("validates every migration target and cycle before detaching anything", () => {
+    const document = new SvgDocument();
+    document.add(new Group("outer", [new Group("inner", [new Rect("r1", 1, 2, 3, 4)])]));
+    const roots = document.getShapes();
+
+    for (const { target, id, message } of [
+      { target: "missing", id: "r1", message: "no such container: missing" },
+      { target: "r1", id: "outer", message: "not a container: r1" },
+      { target: "outer", id: "missing", message: "no such shape: missing" },
+      { target: "outer", id: "outer", message: "cannot add a shape into itself or its descendant: outer" },
+      { target: "inner", id: "outer", message: "cannot add a shape into itself or its descendant: outer" },
+    ]) {
+      assert.throws(() => document.addTo(target, id), { message });
+      assert.deepEqual(document.getShapes(), roots);
+      assert.equal(document.getParent("r1"), document.getShape("inner"));
+    }
+  });
 });

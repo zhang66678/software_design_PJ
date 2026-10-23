@@ -76,6 +76,19 @@ export class SvgDocument {
     return shape;
   }
 
+  public addTo(containerId: string, id: string): Shape {
+    const container = this.getContainer(containerId);
+    const shape = this.getShape(id);
+    if ([...shape.walk()].some((node) => node.id === container.id)) {
+      throw new DomainError(`cannot add a shape into itself or its descendant: ${id}`);
+    }
+
+    this.remove(id);
+    // Removal rebuilds ancestors; add resolves the current target by id again.
+    this.add(shape, containerId);
+    return shape;
+  }
+
   public getShapes(): readonly Shape[] {
     return Object.freeze([...this.#shapes]);
   }

@@ -7,6 +7,48 @@ import { fileURLToPath } from "node:url";
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
 
+  it("moves and deletes complete subtrees while preserving history across errors", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init",
+        "create g source",
+        "create g node in source",
+        "create rect r1 10 20 30 40 red in node",
+        'create text label 10 40 "开始" in node',
+        "create g target",
+        "create rect existing 0 0 1 1 in target",
+        "addto target node", "show node",
+        "delete node", "tree target", "undo",
+        "addto node target", "delete missing", "addto r1 node",
+        "tree target", "redo", "undo", "undo", "show node",
+        "redo", "show r1",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, [
+      "error: cannot add a shape into itself or its descendant: target",
+      "error: no such shape: missing",
+      "error: not a container: r1",
+      "",
+    ].join("\n"));
+    for (const output of [
+      "g#node added to g#target",
+      "g#node  parent=g#target",
+      "g#node deleted",
+      "g#target\n└── rect#existing  x=0 y=0 width=1 height=1",
+      '    └── text#label  x=10 y=40  "开始"',
+      "redone: g#node deleted",
+      "g#node  parent=g#source",
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+    assert.ok(result.stdout.endsWith("rect#r1  parent=g#node\n  x=10 y=20 width=30 height=40\n  fill=red\n"));
+  });
+
   it("builds the two-node flowchart and edits nested containers through the real CLI", () => {
     const result = spawnSync(execPath, [entry], {
       input: [
