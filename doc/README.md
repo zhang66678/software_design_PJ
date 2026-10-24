@@ -1,163 +1,113 @@
 # SVG 编辑器 CLI：Phase 1
 
-需求见 [phase_cli_1.md](../phase_cli_1.md)，仓库为 [software_design_PJ](https://github.com/zhang66678/software_design_PJ)。
+[课程需求](../phase_cli_1.md) · [运行与使用](../README.md) · [架构图源文件](architecture.puml)
 
-## 一、架构方案
+## 架构方案
 
-### 1. 项目目标
+### 模块与依赖方向
 
-使用 TypeScript 和面向对象方式实现 SVG 命令行编辑器，覆盖本阶段的六种内置类型及文档、编辑、显示、撤销重做命令。`box` 和动态插件属于后续阶段。
-
-### 2. 模块划分
-
-| 目录 | 职责 | 允许依赖 |
+| 模块 | 职责 | 允许依赖 |
 | --- | --- | --- |
-| `src/domain` | 图形行为、文档树、id 与结构规则 | 本模块，不依赖 CLI、文件或 XML 库 |
-| `src/application` | 命令执行、撤销历史、会话及 IO 接口 | domain、本模块 |
-| `src/presentation` | 命令解析与显示格式 | application、领域只读接口 |
-| `src/infrastructure` | 文件、XML、终端的具体适配 | domain、application 定义的接口、终端接口 |
-| `src/bootstrap` | 创建对象、连接各模块并启动 | 上述模块，仅负责组装 |
+| `domain` | 图形行为、有序文档树、几何与 id 约束 | 本模块 |
+| `application` | 应用命令、会话、撤销历史及存储接口 | 本模块、domain |
+| `presentation` | CLI 解析、显示、错误格式及终端接口 | 本模块、application、domain |
+| `infrastructure` | SVG 编解码、文件与终端适配 | 本模块、application、domain；presentation 仅限 Terminal 接口 |
+| `bootstrap` | 组装对象、启动程序、处理启动失败与退出码 | 上述模块、Node.js process |
 
-图形操作和撤销规则与终端、文件系统分离，可以独立验证。
+领域层不依赖终端、文件系统或 XML 库，应用层通过接口请求存储，具体适配器由入口注入。presentation 不依赖 infrastructure，实现替换集中在 bootstrap。图中箭头表示源码依赖，包括类型导入。
 
 ```plantuml
 @startuml
 title SVG CLI Phase 1 — 模块依赖
 skinparam componentStyle rectangle
-component "bootstrap\n对象组装" as Boot
-component "presentation\nCLI / 格式化" as UI
-component "application\nCommand / History / Ports" as App
+component "bootstrap\nMain / 对象组装与启动" as Boot
+component "presentation\nCLI / 格式化 / Terminal 接口" as UI
+component "application\nCommand / History / SvgStorage 接口" as App
 component "domain\nShape / Group / SvgDocument" as Domain
-component "infrastructure\n文件 / XML / 终端适配器" as Infra
+component "infrastructure\nSvgCodec / 文件与终端适配" as Infra
+component "saxes\nXML 解析" as XML <<external>>
+component "Node.js\nprocess / fs / readline" as Node <<external>>
 Boot --> UI
 Boot --> App
 Boot --> Infra
+Boot --> Node : 启动错误与退出码
 UI --> App
 UI --> Domain
 App --> Domain
-Infra --> App : 实现端口
-Infra --> UI : 实现终端接口
+Infra --> App : 存储接口与图形工厂
+Infra --> UI : 仅 Terminal 接口
 Infra --> Domain
+Infra --> XML
+Infra --> Node
+note right of App
+  ShapeFactory：图形类型名分派
+  后续插件化的待重构点
+end note
+note left of UI
+  CommandRegistry：命令名分派
+  后续命令注册的待重构点
+end note
 @enduml
 ```
 
-图中箭头表示源码依赖，源文件见 [architecture.puml](architecture.puml)。
+### 设计模式与核心对象
 
-### 3. 设计模式选择
+- **Command**：所有命令通过 `Command.execute(executor)` 执行。创建、移动、缩放、属性和结构编辑继承 `EditCommand`，共用 `CommandExecutor`；查询和文档 IO 也使用统一入口。
+- **Composite**：`Group` 与五种叶子类型都继承 `Shape`。移动、缩放、克隆和遍历通过多态完成，命令不区分容器与叶子；文字缩放改变 x/y，不改变字体。
+- **Memento**：`DocumentSnapshot` 保存独立文档副本，`HistoryEntry` 持有编辑前后的快照。undo/redo 恢复结果，不重新执行命令。
 
-- **Command**：应用命令共享 `Command.execute(executor)` 入口；编辑命令继承 `EditCommand`，通过 `CommandExecutor` 执行并记录前后快照，统一恢复 undo/redo 的结果。
-- **Composite**：让容器和叶子图形共享操作接口，容器递归处理子图形。
+`Shape` 封装不可变 id 与公共样式，叶子类封装各自几何和文字；`Style` 保留属性未设置的状态。只读描述 `ShapeDescription` 供显示和编码使用，修改行为仍由领域对象承担。
 
-撤销恢复采用文档快照（Memento）：图形通过多态克隆保存自身状态，历史机制无需了解具体图形的几何属性。
+`SvgDocument` 管理画布尺寸、有序根节点及全树 id 唯一性，集中处理查找、父级定位、挂接、摘除、分组和重排。容器子节点列表只读，结构变更通过 `withChildren()` 重建祖先路径；无需另外维护父指针或索引。`Group` 的公共样式保存在组上，由 SVG 继承，保留子节点显式样式。
 
-命令名到实现、图形类型名到类的分派分别集中在命令注册处和图形工厂。这两处是类型与命令扩展的待重构点。
+编辑先在候选文档上执行，再生成结果快照，全部成功后才替换会话并记录历史。一条成功编辑对应一个 undo 单元，失败保留文档、历史及屏障；成功的新编辑清空 redo。整份文档快照会增加复制与内存开销，当前选择适合课程规模的直接实现。
 
-### 4. 变化点假设
+`EditorSession` 同时保存当前快照与默认文件路径。成功 init、read、save 或修改 canvas 尺寸后设置历史屏障；查询不改变历史。read 与显式 save 更新默认路径，init 清除路径，canvas 保留路径，失败 IO 不更新路径或历史。
 
-| 可能变化 | 扩展准备 |
+### SVG 与终端适配
+
+应用层的 `SvgStorage` 接口由 `NodeSvgStorage` 实现，命令保持同步。`SvgCodec` 负责编解码，saxes 仅负责 XML 合法性、命名空间和实体解码；图形还原复用 `ShapeFactory` 的同一份类型定义，不增加按标签名分派的位置。
+
+读取先解析并验证完整候选文档，收集全部显式 id 后，按先序为缺失或空 id 分配“标签名+序号”，避免抢占文件中后续节点的名称。只有替换会话成功后，才返回警告与摘要。保存先完成 XML 编码，再独占创建同目录临时文件并重命名；写入失败时清理本次拥有的临时文件。
+
+读取支持六种内置类型、显式 fill/stroke/stroke-width、有限数或 px 几何值，以及零原点且与画布尺寸一致的 viewBox。未提供的图形几何值按 0 处理。未知元素、transform、CSS、字体属性、DTD 和处理指令明确拒绝；支持范围与[使用说明](../README.md#svg-支持范围)一致，不承诺完整 SVG 标准兼容。
+
+`Tokenizer` 处理注释、双引号和 Windows 路径；`CommandRegistry` 创建命令，并由同一份注册信息生成 help。`DocumentFormatter` 通过通用描述和子节点接口递归输出 tree/show，`ErrorFormatter` 将异常转换为单行 `error:`。`CliLoop` 捕获单条命令错误后继续处理输入，`NodeTerminal` 实现标准流和交互提示符，管道输入在 EOF 后退出。
+
+### 变化点与取舍
+
+| 可能变化 | 当前准备或取舍 |
 | --- | --- |
-| 增加图形类型 | 集中创建入口，通过多态完成图形行为 |
-| 增加 GUI 或其他输入方式 | 命令对象与终端输入分离 |
-| 更换 SVG 解析库或存储方式 | 用 IO 接口隔离具体实现 |
+| 新增图形或插件 | Shape 多态接口与统一工厂；ShapeFactory 的硬编码类型表是待重构点，当前不实现 box 或动态加载 |
+| 新增命令或输入通道 | Command 与终端分离；CommandRegistry 的硬编码命令表是待重构点，当前不实现插件注册框架 |
+| 更换文件适配器或 XML 库 | SvgStorage 隔离存储，SvgCodec 封装 XML；更换解析库只修改基础设施与组装 |
+| 大文档或长历史 | 当前递归遍历与完整快照便于验证，暂不增加索引缓存、增量历史或通用场景图框架 |
 
-### 5. 工程工具
+## 过程记录
 
-运行环境采用 Node.js 24。TypeScript 使用严格类型检查，以 NodeNext 模块规则编译为原生 ESM；ESLint 使用 [typescript-eslint 推荐配置](https://typescript-eslint.io/getting-started/)，并约束一类一文件及成员的显式访问修饰符。
+保留三项影响最终实现的关键修正：
 
-依赖版本由 `package-lock.json` 锁定，使用 `npm ci` 安装。`src/bootstrap/Main.ts` 为程序入口，`npm run cli` 通过 `precli` 自动构建后启动。
+1. **迁移中的祖先旧引用。** 摘除节点会重建祖先，继续使用旧目标容器可能带回已经摘除的内容。最终在摘除后按 id 重新定位目标，领域测试验证迁入祖先、同父级迁移及原有顺序，应用测试验证 undo 恢复父级与位置。
+2. **结果快照也可能失败。** 编辑方法成功不代表整条命令可以提交。执行器先构造结果快照和历史记录，再替换会话；通过主动触发 clone 失败的测试，确认文档、redo 和屏障不被提前改变。
+3. **SVG 导入的分派与命名。** 重新按标签分派会重复图形工厂，边读边补 id 又可能抢占后面的显式名称。最终复用工厂元数据，并先收集显式 id 再统一补名；往返测试和后置显式 id 用例验证类型、顺序、样式与名称保持正确。
 
-### 6. 领域模型
+## 一致性自查
 
-| 类或接口 | 职责 |
-| --- | --- |
-| `Shape` | 封装不可变 id 和公共样式，统一移动、缩放、属性修改、克隆与描述接口 |
-| `Rect` / `Circle` / `Ellipse` / `Line` / `Text` | 各自封装几何状态，实现几何编辑与克隆 |
-| `Style` | 校验公共样式，以新对象更新属性，保留未设置状态并输出只读属性 |
-| `SvgDocument` | 管理画布、有序根节点、id 唯一校验与查找，通过多态克隆图形 |
-| `DomainError` | 表达领域校验失败，不依赖终端输出 |
-| `ShapeDescription` | 供显示与序列化使用的只读描述，不承担图形修改行为 |
+**模块划分：** 实际源码按 domain、application、presentation、infrastructure、bootstrap 五个目录组织，与方案一致。文档树与结构规则位于 domain，文件和 XML 实现在 infrastructure；存储接口位于 application，终端接口位于 presentation。图中的文件适配和工厂依赖已反映最终实现。
 
-几何字段使用私有状态，修改通过领域方法完成，属性通过只读描述获取。位置接受有限浮点数，矩形宽高、圆半径和椭圆半轴长度为非负有限数；画布宽高为正有限数。移动先校验完整目标几何，成功后统一修改，非法输入和数值溢出均不留下部分修改。
+**依赖方向：** 对 52 个 TypeScript 源文件的 178 条静态 import 进行检查，模块间依赖与图示一致，未发现违反上述规则的导入。infrastructure 对 presentation 的导入仅为 Terminal 接口；bootstrap 对 node:process 的使用仅用于启动错误输出和退出码。此检查覆盖静态导入，不替代运行时行为测试。
 
-线段移动同时更新两个端点。文字内容由 `Text` 单独保存，通过 `ShapeDescription.textContent` 描述，与几何和样式属性分开，保留中文、空格与空字符串。
-
-属性描述与节点列表返回冻结的副本，调用者不能通过改写这些结果修改内部字段或根节点顺序。克隆使用图形自身的 `clone()`，保留具体类型和行为，原文档与副本的后续修改互不影响。
-
-### 7. 命令执行与撤销历史
-
-| 类 | 职责 |
-| --- | --- |
-| `Command` | 定义应用命令的统一执行入口 |
-| `EditCommand` | 将编辑交给执行器，通过 `apply()` 修改候选文档并返回结果摘要 |
-| `CommandExecutor` | 组织候选文档、执行命令并提交结果，提供撤销、重做和历史屏障入口 |
-| `EditorSession` | 持有当前文档快照，返回独立文档副本，捕获与恢复会话中的文档状态 |
-| `DocumentSnapshot` | 通过深拷贝隔离文档，每次恢复均产生独立对象 |
-| `HistoryEntry` | 保存一次编辑前后的快照与摘要，按整个命令恢复状态 |
-| `CommandHistory` | 管理撤销栈、重做栈及历史屏障 |
-| `ApplicationError` | 表达缺少文档、空历史或撤销重做被禁止等应用规则错误 |
-
-编辑通过 `CommandExecutor.execute()` 统一执行：捕获原快照，克隆出候选文档，调用编辑命令的 `apply()` 完成操作，再构造结果快照。上述准备全部成功后，才替换会话状态并记录历史。命令执行或结果快照生成失败时，原文档、撤销栈、重做栈和屏障状态均保持不变。
-
-一条成功的编辑命令形成一个撤销单元，即使内部修改了多个图形。撤销恢复执行前的快照，重做恢复执行后的快照，不重新执行命令；新的成功编辑清空重做栈。查询只读取会话返回的副本，不进入历史，也不能通过修改副本改变当前文档。
-
-`CommandExecutor.replaceDocument()` 在整体替换文档后清空两个历史栈并设置屏障；`CommandExecutor.setHistoryBarrier()` 保留文档内容并设置相同屏障。屏障期间撤销和重做均报 `undo not allowed after io command`，读取文档和失败编辑不能解除屏障，下一次成功编辑开始新的历史。
-
-快照使用图形自身的 `clone()`，保留具体类型、样式缺省和节点顺序。会话读取结果以及命令保留的候选文档引用都与当前状态隔离。每次编辑需要复制整个文档，历史内存随文档规模与编辑次数增长；这一方案用较直接的实现保证多图形操作的原子性，适合课程项目规模。
-
-### 8. 应用命令与图形创建
-
-| 命令类 | 行为与历史规则 |
-| --- | --- |
-| `InitCommand` | 新建空文档，宽高默认 800×600；尺寸校验成功后整体替换文档并设置历史屏障 |
-| `CreateCommand` | 通过图形工厂创建图形，加入文档；一次创建形成一个撤销单元 |
-| `MoveCommand` | 按 id 查找图形，通过 `Shape.move()` 平移；一次移动形成一个撤销单元 |
-| `ScaleCommand` | 通过 `Shape.scale()` 缩放几何，形成一个撤销单元 |
-| `SetCommand` | 通过 `Shape.set()` 修改白名单属性，形成一个撤销单元 |
-| `UndoCommand` | 恢复上一条编辑前的文档，并将记录移入重做栈 |
-| `RedoCommand` | 恢复被撤销编辑后的文档，并将记录移回撤销栈 |
-
-调用方以 `Command` 类型持有命令，统一调用 `execute(executor)`。编辑命令由 `EditCommand` 转交事务执行器，文档初始化和撤销重做命令直接调用执行器对应的操作。命令不读取终端或打印输出，成功时返回摘要，失败时抛出异常。
-
-图形类型名到创建器的映射集中在 `ShapeFactory`，代码中标注为待重构点。工厂解析各图形的几何参数和文字内容；矩形、圆、椭圆可指定 fill，线段可指定 stroke，省略时保留样式缺省。`CommandArguments` 校验参数数量并转换有限数值，图形类和 `Style` 负责 id、几何与样式的领域约束。未知类型按约定报 `unknown shape type: <type> (is the plugin loaded?)`。
-
-`CreateCommand` 保存创建参数的副本，调用方后续修改原参数数组不会影响命令。移动通过图形多态执行，摘要统一报告移动增量，例如 `rect#r1 moved by (30,0)`，无需按图形类型选择移动或反馈逻辑。
-
-缩放因子必须为正有限数，同时乘上位置与尺寸；线段改变四个端点坐标，文字改变 x/y，样式和文字内容保持原值。`set` 的公共样式由 `Style` 校验并返回新对象，各图形校验自身的几何属性白名单，`Text` 另支持 `text`。几何修改先验证完整候选值，再统一更新私有字段；命令继续复用快照历史。
-
-### 9. 终端解析与显示
-
-| 类或接口 | 职责 |
-| --- | --- |
-| `Tokenizer` | 按空白和双引号分词，处理整行注释与引号内转义，不解释命令或图形类型 |
-| `CommandRegistry` | 集中命令名分派，校验入口参数并创建命令；从同一份注册信息生成 help |
-| `TreeCommand` / `ShowCommand` / `HelpCommand` | 通过统一命令入口返回查询结果，不进入编辑历史 |
-| `DocumentFormatter` | 从图形只读描述生成 tree/show 文本，显示几何、显式样式与父节点 |
-| `ErrorFormatter` | 将异常转换为一行以 `error:` 开头的信息 |
-| `CliLoop` | 顺序读取输入，执行命令、输出结果，捕获单条命令错误并继续，结束时关闭终端 |
-| `Terminal` / `NodeTerminal` | presentation 定义终端接口，infrastructure 用 Node.js readline 和流实现读写 |
-
-`Main` 组装会话、事务执行器、图形工厂、命令注册表和终端。执行路径为逐行输入 → Tokenizer → CommandRegistry → Command.execute；编辑通过事务执行器提交，查询读取会话提供的独立副本。命令名分派与图形类型分派分别标注在 CommandRegistry、ShapeFactory 中，显示模块按通用属性描述工作。
-
-空白行和首个非空白字符为 `#` 的整行注释跳过；命令参数中的 `#` 保留为字面内容。双引号保留参数中的空格和空字符串，引号内识别双引号及反斜杠转义，其余反斜杠原样保留。未闭合引号作为当前行的错误处理，不影响后续输入。
-
-交互终端使用 `svg> ` 提示符，支持 `Ctrl+C` 退出。通过管道输入时隐藏提示符，并在 EOF 后正常结束；异步逐行遍历保留缓冲区中的命令顺序，末行没有换行也会执行。正常结果写入标准输出，错误写入标准错误流。
-
-`tree` 内联展示 SVG 属性名与数值，`show` 分行显示几何和样式；省略的样式不补默认属性。包含空格的属性值使用引号显示。使用示例见[根目录 README](../README.md#使用示例)。
+源码共 49 个类，检查确认每文件至多一个类且文件名与类名一致；状态通过私有字段封装。命令名与图形类型名分派仅位于 CommandRegistry、ShapeFactory，并在源码及图中标记为待重构点；显示和 SVG 编码不按图形类型分派。
 
 ## 质量保证手段
 
-`npm run check` 依次执行类型检查、ESLint 静态检查、自动化测试和编译构建，任一检查失败即停止。类型检查同时覆盖源码与测试，构建只输出产品源码。
+`npm run check` 依次执行 TypeScript 类型检查、ESLint、测试和构建，失败即停止。源码和测试保留 strict、exactOptionalPropertyTypes、越界访问和 override 等检查；skipLibCheck 用于避开 XML 依赖声明文件的兼容性问题，不关闭项目源码类型检查。ESLint 约束每文件类数量和成员访问修饰符。
 
-测试使用 Node.js 内置的 `node:test` 和 `node:assert/strict`。`pretest` 将测试及依赖源码编译到 `.test-dist/`，再由 Node.js 执行测试，编译产物不纳入版本控制。
+自动化测试使用 Node.js 内置 node:test，当前为 **28 组、304 个测试**，覆盖：
 
-领域测试覆盖图形移动、缩放、属性修改与克隆、非法几何与数值溢出、只读封装、样式缺省、大小写敏感的 id 唯一性、根节点顺序及深拷贝隔离。测试通过检查完整状态确认失败不改变图形或文档。
+- 图形与树：六种类型、嵌套、全树 id 唯一性、几何溢出、分组、迁移、删除、同级顺序和深拷贝隔离。
+- 命令与历史：整条命令的 undo/redo、失败原子性、结果快照失败、查询保留历史、成功编辑清空 redo 及 IO 屏障。
+- SVG 与文件：中文和 XML 转义、缺省样式、缺 id 避让、坏 XML、重复 id、非法 UTF-8、实际文件读写、默认路径与失败清理。
+- 真实 CLI：[第 6 节典型会话](../examples/typical-session.txt)与[第 6.1 节版本 A](../examples/flowchart.txt)直接作为测试输入；结构编辑撤销后与原流程图文件逐字节相同，保存后读回一致，box 按阶段边界拒绝。
 
-应用层测试使用小型测试命令操作真实文档，检查多步编辑的撤销重做顺序、整条命令的恢复粒度、失败前已修改部分候选文档时的原子性、失败保留重做记录、成功新编辑清空重做记录，以及屏障的设置与解除。另通过人为触发克隆失败验证结果快照和文档替换失败时仍保留原状态，并检查外部引用不能污染当前文档或历史。
-
-应用命令测试通过统一入口完成新建、创建、移动、撤销和重做，检查矩形 x 坐标依次为 10、40、10、40；同时验证初始化默认值、重复初始化清除旧历史、失败初始化保留重做记录，以及重复 id、缺少文档、缺少图形、非法参数和移动溢出的失败行为。工厂测试覆盖类型识别、参数数量、浮点数与非有限数值、可选样式和领域校验。
-
-终端测试覆盖分词、中文与带空格参数、Windows 路径、引号转义、整行注释和十六进制色值，以及命令参数校验、错误前缀、只读查询和交互提示符。真实入口集成测试启动独立 Node.js 进程，回放矩形编辑会话、错误后继续输入、中文参数及批量命令；检查完整输出、标准错误、执行顺序和 EOF 退出。
-
-交互终端与 npm 启动的管道输入均回放矩形编辑示例，核对移动、撤销和重做后的属性；交互模式另验证 `Ctrl+C` 正常退出。
-
-CI 工作流覆盖 Windows 和 Linux，执行 `npm ci`、`npm run check` 和 CLI 启动验证；启动验证从标准输入传入 `help` 并在 EOF 后结束，使依赖安装、检查和程序启动使用统一入口。
+依赖由 package-lock.json 锁定，GitHub Actions 配置 Windows 与 Linux 检查，执行 npm ci、npm run check 及 CLI 启动验证。远端通过状态以对应提交的 Actions 记录为准。按[示例回放说明](../README.md#回放课程示例)生成的两个 SVG 已完成视觉检查：典型示例的标题、圆和矩形显示正常，流程图中文无乱码，节点与连接线位置正确。

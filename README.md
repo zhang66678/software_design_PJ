@@ -1,149 +1,93 @@
 # SVG 编辑器 CLI
 
-软件设计课程项目，使用 TypeScript 和 Node.js，通过终端命令创建、编辑图形、文字及嵌套容器，查看文档结构，并撤销、重做编辑操作。
-
-## 环境
-
-- Node.js 24
-- npm 11 或以上版本
+软件设计课程 Phase 1 项目，使用 TypeScript 和 Node.js 创建、编辑及读写 SVG。内置 rect、circle、ellipse、line、text、g 六种类型，支持嵌套容器、文档树和整条编辑命令的撤销重做。
 
 ## 安装与运行
 
-在项目根目录执行：
+环境：**Node.js 24、npm 11 或以上版本**。在项目根目录执行：
 
 ```shell
 npm ci
 npm run cli
 ```
 
-启动命令会先编译 TypeScript，再进入交互终端：
-
-```text
-svg-editor 0.1.0 — type 'help' for commands
-svg>
-```
-
-Windows PowerShell 若限制运行 `npm.ps1`，可以将命令中的 `npm` 换成 `npm.cmd`。
-
-输入 `help` 查看命令，按 `Ctrl+C` 退出。
+启动时自动编译，然后显示 `svg>` 提示符。输入 `help` 查看命令，按 `Ctrl+C` 退出。PowerShell 若限制运行 npm.ps1，可将 npm 换成 npm.cmd。
 
 ## 使用示例
 
-启动后逐行输入：
+逐行输入以下命令，创建带文字的节点，移动后撤销，再保存并读回：
 
 ```text
-init 800 600
-create rect r1 10 20 100 50 #4a90d9
-move r1 30 0
+init 400 200
+create g node
+create rect start 30 70 160 60 #4a90d9 in node
+create text label 65 105 "开始" in node
+move node 20 0
 tree
 undo
-show r1
-redo
+show label
+set label text "开始流程"
+save "my diagram.svg"
+read "my diagram.svg"
 tree
 ```
 
-`move` 使用增量坐标，因此矩形的 x 从 10 变为 40。撤销后 `show r1` 显示 x=10，重做后 `tree` 显示 x=40。
+容器移动会递归作用于矩形与文字，一次 undo 同时恢复两者。保存的 UTF-8 SVG 可直接用浏览器打开。
 
-也可以创建其他图形和文字：
+## 命令
 
-```text
-create circle c1 100 100 20 red
-create ellipse e1 200 100 40 20 #4a90d9
-create line edge 120 100 160 100 black
-create text title 20 40 "我的流程图"
-```
+| 语法 | 用途 |
+| --- | --- |
+| `init [w] [h]` | 新建画布，默认 800×600；清除默认文件路径并设置历史屏障 |
+| `canvas [w] [h]` | 查询或修改画布尺寸；只给宽度时保留当前高度 |
+| `read <file.svg>` | 读入文件，缺 id 自动补全并警告 |
+| `save [file.svg]` | 保存文件；省略路径时使用最近一次成功读取或保存的路径 |
+| `create rect <id> <x> <y> <w> <h> [fill]` | 创建矩形 |
+| `create circle <id> <cx> <cy> <r> [fill]` | 创建圆 |
+| `create ellipse <id> <cx> <cy> <rx> <ry> [fill]` | 创建椭圆 |
+| `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段 |
+| `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
+| `create g <id>` | 创建空容器 |
+| `delete <id>` | 删除图形或完整子树 |
+| `addto <gid> <id>` | 将已有图形或子树移到目标容器末尾 |
+| `group <newGid> <id1> <id2>...` | 将至少一个已有图形收编进新容器 |
+| `ungroup <gid>` | 解散嵌套容器，子节点占据原组的位置 |
+| `front <id>` / `back <id>` | 调整同级显示顺序 |
+| `move <id> <dx> <dy>` | 按增量移动图形或整棵子树 |
+| `scale <id> <factor>` | 按正有限因子同时缩放位置和尺寸 |
+| `set <id> <attr> <value>` | 修改几何、公共样式或文字内容 |
+| `tree [id]` | 显示整份文档或指定图形的完整子树 |
+| `show <id>` | 显示图形属性与真实父节点 |
+| `help` | 显示命令语法 |
+| `undo` / `redo` | 撤销或重做一条编辑 |
 
-缩放和修改属性：
+所有 create 类型均可追加 `in <containerId>`，省略时挂在画布根级。id 全树唯一且区分大小写。整行以 `#` 开头时为注释，颜色中的 `#` 保留；带空格的参数用双引号包裹。
 
-```text
-scale r1 2
-set r1 fill #f5a623
-set r1 width 160
-set title text "流程图 v2"
-show r1
-```
+### 几何、样式与结构
 
-创建容器并直接指定图形归属：
+- 坐标允许有限浮点数；宽高和半径可为零，但不能为负；画布尺寸必须为正有限数。canvas 修改尺寸保留图形几何与层级。
+- scale 基于坐标原点，同时乘上全部几何属性；文字只改变 x/y。set 支持各类型的几何属性、fill、stroke、stroke-width，文字内容使用 text 修改。未设置的样式保留缺省，容器样式按 SVG 继承。
+- addto 保留子树、几何和显式样式，目标不能为自身或后代；目标为当前父级时移到同级末尾。
+- 同父级 group 占最早选中节点的位置；跨父级按原文档遍历顺序收编，新组放根级末尾。不能重复选中目标或同时选中祖先与后代。ungroup 保留子节点几何与显式样式，按课程约定不能解散 svg 的直接子容器。
+- SVG 按同级顺序绘制。front 移到同级列表末尾、显示在最前；back 移到开头、显示在最后。两者保留层级和图形内容。
 
-```text
-init 800 600
-create g flowchart
-create g node1 in flowchart
-create rect start 120 100 160 60 #4a90d9 in node1
-create text start-label 155 135 "开始" in node1
-move node1 0 100
-tree flowchart
-show start-label
-undo
-```
+### 文件与历史
 
-移动或缩放容器会递归作用于全部后代，一次操作对应一个撤销单元。`tree <id>` 显示指定图形及其完整子树，`show` 显示真实父级。
+成功 init、read、save 或修改 canvas 尺寸后禁止 undo/redo，下一次成功编辑开始新的历史。tree、show、help 和无参 canvas 不改变历史；撤销后执行新的成功编辑会清空 redo。
 
-在上面的文档中，可以继续迁移已有节点或删除子树：
+成功 read 或显式 save 更新默认文件路径，init 清除路径，canvas 保留路径。尚无路径时首次 save 必须指定文件名；同路径保存会替换原文件，目标父目录需已存在。摘要计数包含容器与后代，不包含 svg 根。
 
-```text
-create g archive
-addto archive node1
-delete node1
-undo
-undo
-```
+命令失败时输出一行以 `error:` 开头的信息，保留当前文档、默认路径和历史，随后可继续输入命令。缺失或空 id 按“标签名+序号”补全并逐条警告，避开文件中全部已有 id；重复 id 或非法数据使整次读取失败。
 
-`addto` 将图形或容器移到目标容器的末尾，保留子树、几何和显式样式；目标是当前父级时调整到同级末尾。容器不能迁入自身或后代。`delete` 删除目标及全部后代，撤销时恢复原父级、顺序和内容。
+## SVG 支持范围
 
-将已有图形收编成组，或解散嵌套分组：
+读取 UTF-8 XML 1.0 SVG，支持六种内置类型及其嵌套结构、同级顺序、显式公共样式和文字。几何值支持有限数及 px 单位，未提供的图形几何属性按 0 处理。画布需提供正的 width/height，或由 viewBox 推导尺寸；viewBox 须以 (0,0) 为原点且与画布尺寸一致。
 
-```text
-group content start-label start
-tree node1
-ungroup content
-```
-
-`group` 至少指定一个已有图形。同父级分组占最早选中节点的位置，子节点保持原顺序；跨父级分组按原文档遍历顺序收编，新组放在根级末尾。重复目标、id 冲突及同时选择祖先与后代会报错。
-
-`ungroup` 将子节点按原顺序插回原组的位置，保留几何与显式子样式。按课程约定，不能解散 svg 的直接子容器；可以通过 undo 撤销刚刚创建的根级分组。
-
-调整同级显示顺序与画布尺寸：
-
-```text
-front start-label
-back start
-canvas
-canvas 1024 768
-```
-
-SVG 按同级节点顺序绘制，`front` 将目标移到同级列表末尾、显示在最前，`back` 移到开头、显示在最后。容器作为整体调整顺序，层级和图形内容保持原值。
-
-`canvas` 无参查询尺寸；带参修改尺寸时保留图形坐标、大小和层级，只给宽度则保留当前高度。尺寸必须为正有限数。成功修改尺寸后设置历史屏障，下一次成功编辑开始新的撤销历史。
-
-保存为 SVG 文件：
-
-```text
-save "flow chart.svg"
-move node1 20 0
-save
-```
-
-文件使用 UTF-8 SVG 格式，可直接在浏览器中预览，保留嵌套结构、同级顺序、显式样式和文字内容。尚未读取或保存文件时，首次保存需指定路径；无参 `save` 使用最近一次成功读取或保存的路径，同路径保存会替换原文件。`init` 清除默认路径，`canvas` 修改尺寸保留路径。
-
-保存成功后设置历史屏障；保存失败时保留当前文档、默认路径和撤销重做记录。成功摘要统计全部图形和容器，不包含 svg 根元素。
-
-读取并继续编辑已有文件，也可以直接作为启动后的第一条命令：
-
-```text
-read "flow chart.svg"
-tree
-move node1 10 0
-save
-```
-
-`read` 恢复六种内置图形及嵌套结构、顺序、显式样式和文字；缺失或空 id 按“标签名+序号”自动补全并逐条警告，分配时避开文件中全部已有 id。重复 id 或非法数据会使整次读取失败，原文档、路径及历史保持不变；成功读取后设置历史屏障，并记住文件路径。
-
-读取范围为 UTF-8 XML 1.0 SVG，几何值支持有限数和 px 单位，未提供的图形几何属性按 0 处理。画布需提供正的 width/height，或由 viewBox 提供尺寸；viewBox 须以 (0,0) 为原点且与画布尺寸一致。不支持的元素、transform、CSS、字体等属性，以及 DTD 和处理指令会明确报错。本项目保存的文件可以完整读回。
+不支持的元素、transform、CSS、字体等属性，以及 DTD 和处理指令会明确报错。本项目导出的文件可以完整读回。box 与动态插件属于后续阶段，当前创建 box 会报 unknown shape type。
 
 ## 回放课程示例
 
-项目提供[典型会话](examples/typical-session.txt)、[两节点流程图](examples/flowchart.txt)和[外部 SVG](examples/other.svg)。在项目根目录用 PowerShell 执行：
+提供[典型会话](examples/typical-session.txt)、[两节点流程图](examples/flowchart.txt)和[外部 SVG](examples/other.svg)。在项目根目录用 PowerShell 执行：
 
 ```powershell
 npm run build
@@ -154,59 +98,22 @@ cmd /c "node dist/bootstrap/Main.js < examples\typical-session.txt"
 
 Linux/macOS 可先执行 `mkdir -p examples/output`，再用 `node dist/bootstrap/Main.js < examples/flowchart.txt` 或对应的典型会话文件回放。
 
-生成的 `flowchart.svg` 和 `demo.svg` 位于 `examples/output/`，可直接用浏览器打开，该目录不纳入版本控制。典型会话预期输出两条错误（非法分组、保存后撤销）和一条自动补 id 警告，随后继续正常执行；流程图示例应无错误。
+生成的 flowchart.svg 和 demo.svg 位于 examples/output/，可直接用浏览器打开，该目录不纳入版本控制。典型会话预期输出两条错误（非法分组、保存后撤销）和一条自动补 id 警告，随后继续正常执行；流程图示例应无错误。
 
-## 命令
-
-| 语法 | 用途 |
-| --- | --- |
-| `init [w] [h]` | 新建画布，默认 800×600；清除原文档和历史记录 |
-| `canvas [w] [h]` | 查询或修改画布尺寸；修改后设置历史屏障 |
-| `read <file.svg>` | 读取 SVG，缺 id 时自动分配并警告；成功后设置默认路径和历史屏障 |
-| `save [file.svg]` | 保存 SVG，省略路径时使用上次成功读取或保存的路径 |
-| `create rect <id> <x> <y> <w> <h> [fill]` | 创建矩形，id 唯一且区分大小写；省略 fill 时遵循 SVG 默认样式 |
-| `create circle <id> <cx> <cy> <r> [fill]` | 创建圆，指定圆心和半径 |
-| `create ellipse <id> <cx> <cy> <rx> <ry> [fill]` | 创建椭圆，指定中心和两个半轴长度 |
-| `create line <id> <x1> <y1> <x2> <y2> [stroke]` | 创建线段，指定两端坐标及可选描边色 |
-| `create text <id> <x> <y> "content"` | 创建文字，保留中文、空格和空内容 |
-| `create g <id>` | 创建空容器，可继续嵌套容器或图形 |
-| `delete <id>` | 删除图形或完整子树 |
-| `addto <gid> <id>` | 将已有图形或子树迁入目标容器末尾 |
-| `group <newGid> <id1> <id2>...` | 新建容器并收编已有图形，保持原有相对顺序 |
-| `ungroup <gid>` | 解散嵌套容器，将子节点提升到原组的位置 |
-| `front <id>` / `back <id>` | 将图形或容器置于同级最前或最后 |
-| `move <id> <dx> <dy>` | 按增量移动图形或整棵子树 |
-| `scale <id> <factor>` | 按正有限因子同时缩放位置和尺寸 |
-| `set <id> <attr> <value>` | 修改几何属性、公共样式或文字内容 |
-| `tree [id]` | 显示文档结构与几何属性，或显示指定图形的完整子树 |
-| `show <id>` | 显示图形属性与父节点 |
-| `help` | 显示命令语法 |
-| `undo` | 撤销上一条编辑 |
-| `redo` | 重做被撤销的编辑 |
-
-所有类型的 `create` 都支持尾缀 `in <containerId>`，将新图形加入已存在容器的末尾；省略时创建在画布根级。目标不存在或为叶子图形时会报错。
-
-整行以 `#` 开头时作为注释；颜色中的 `#` 会保留。带空格的参数用双引号包裹，例如 `"rgb(255, 0, 0)"`。编辑失败时输出一行以 `error:` 开头的信息，并保留文档与历史，随后可以继续输入命令。
-
-坐标允许有限浮点数，宽高与半径允许为零但不能为负数。
-
-`scale` 基于坐标原点，同时乘上全部几何属性；文字缩放作用于 x/y。`set` 支持 `fill`、`stroke`、`stroke-width` 及各图形的几何属性（如矩形的 x/y/width/height）；文字内容使用 `text` 修改。
-
-`tree`、`show`、`help` 和无参 `canvas` 不改变编辑历史。成功新建画布、修改画布尺寸、读取或保存文件后禁止撤销、重做，下一次成功编辑开始新的历史；撤销后执行新的编辑会清空重做记录。
-
-## 开发检查
+## 工程检查
 
 | 命令 | 用途 |
 | --- | --- |
-| `npm run typecheck` | 检查源码和测试的类型，不生成文件 |
+| `npm run typecheck` | 检查源码和测试类型，不生成文件 |
 | `npm run lint` | ESLint 静态检查 |
-| `npm test` | 编译并运行自动化测试，包含 CLI 真实入口测试 |
-| `npm run build` | 编译到 `dist/` |
-| `npm run check` | 依次执行类型检查、静态检查、测试和构建 |
+| `npm test` | 编译并运行测试，包含真实 CLI 会话 |
+| `npm run build` | 编译产品源码到 dist/ |
+| `npm run check` | 依次执行类型检查、Lint、测试和构建 |
 
-GitHub Actions 在 Windows 和 Linux 上使用 `npm ci` 安装依赖，执行工程检查及 CLI 启动验证。
+GitHub Actions 配置 Windows 和 Linux 检查，使用 npm ci 安装依赖，并验证工程检查及 CLI 启动。
 
 ## 文档
 
 - [课程需求](phase_cli_1.md)
-- [架构说明](doc/README.md)
+- [架构方案、关键决策、一致性自查与质量保证](doc/README.md)
+- [PlantUML 模块依赖图](doc/architecture.puml)
