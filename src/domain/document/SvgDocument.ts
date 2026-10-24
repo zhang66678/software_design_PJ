@@ -1,4 +1,5 @@
 import { DomainError } from "../errors/DomainError.js";
+import { Group } from "../shapes/Group.js";
 import type { Shape } from "../shapes/Shape.js";
 
 interface ShapeLocation {
@@ -46,7 +47,7 @@ export class SvgDocument {
     if (container === undefined) {
       this.#shapes.push(shape);
     } else {
-      this.replace(container.id, container.withChildren([...container.getChildren(), shape]));
+      this.replace(container.id, [container.withChildren([...container.getChildren(), shape])]);
     }
   }
 
@@ -89,6 +90,56 @@ export class SvgDocument {
     return shape;
   }
 
+  public group(id: string, shapeIds: readonly string[]): Group {
+    if (this.find(id, this.#shapes) !== undefined) {
+      throw new DomainError(`id already exists: ${id}`);
+    }
+    const selected = new Set<string>();
+    for (const shapeId of shapeIds) {
+      if (selected.has(shapeId)) {
+        throw new DomainError(`duplicate group target: ${shapeId}`);
+      }
+      this.getShape(shapeId);
+      selected.add(shapeId);
+    }
+    const shapes = this.#shapes.flatMap((root) => [...root.walk()]).filter((shape) => selected.has(shape.id));
+    const first = shapes[0];
+    if (first === undefined) {
+      throw new DomainError("group requires at least one shape");
+    }
+    for (const shape of shapes) {
+      for (const descendant of shape.walk()) {
+        if (descendant.id !== shape.id && selected.has(descendant.id)) {
+          throw new DomainError(`cannot group a container into its own descendant: ${shape.id}`);
+        }
+      }
+    }
+    const group = new Group(id, shapes);
+    const parent = this.getParent(first.id);
+    if (shapes.every((shape) => this.getParent(shape.id) === parent)) {
+      for (const shape of shapes.slice(1)) {
+        this.remove(shape.id);
+      }
+      this.replace(first.id, [group]);
+    } else {
+      for (const shape of shapes) {
+        this.remove(shape.id);
+      }
+      this.add(group);
+    }
+
+    return group;
+  }
+
+  public ungroup(id: string): Shape {
+    const group = this.getContainer(id);
+    if (this.getParent(id) === undefined) {
+      throw new DomainError(`cannot ungroup top-level container: ${id}`);
+    }
+    this.replace(id, group.getChildren());
+    return group;
+  }
+
   public getShapes(): readonly Shape[] {
     return Object.freeze([...this.#shapes]);
   }
@@ -125,23 +176,21 @@ export class SvgDocument {
     return undefined;
   }
 
-  private replace(id: string, replacement?: Shape): void {
-    const shapes = this.#shapes.map((shape) => this.replaceIn(shape, id, replacement))
-      .filter((shape): shape is Shape => shape !== undefined);
+  private replace(id: string, replacements: readonly Shape[] = []): void {
+    const shapes = this.#shapes.flatMap((shape) => this.replaceIn(shape, id, replacements));
     this.#shapes.splice(0, this.#shapes.length, ...shapes);
   }
 
-  private replaceIn(shape: Shape, id: string, replacement: Shape | undefined): Shape | undefined {
+  private replaceIn(shape: Shape, id: string, replacements: readonly Shape[]): readonly Shape[] {
     if (shape.id === id) {
-      return replacement;
+      return replacements;
     }
     const children = shape.getChildren();
-    const updated = children.map((child) => this.replaceIn(child, id, replacement))
-      .filter((child): child is Shape => child !== undefined);
+    const updated = children.flatMap((child) => this.replaceIn(child, id, replacements));
     if (updated.length === children.length && updated.every((child, index) => child === children[index])) {
-      return shape;
+      return [shape];
     }
 
-    return shape.withChildren(updated);
+    return [shape.withChildren(updated)];
   }
 }

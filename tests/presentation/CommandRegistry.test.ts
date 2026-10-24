@@ -27,6 +27,8 @@ describe("CommandRegistry", () => {
       "  create <type> <id> [params...] [in <containerId>]",
       "  delete <id>",
       "  addto <gid> <id>",
+      "  group <newGid> <id1> <id2>...",
+      "  ungroup <gid>",
       "  move <id> <dx> <dy>",
       "  scale <id> <factor>",
       "  set <id> <attr> <value>",
@@ -56,6 +58,7 @@ describe("CommandRegistry", () => {
     "init 1 2 3", "create", "create rect", "move r1 1", "move r1 1 2 3",
     "scale r1", "set r1 fill",
     "delete", "delete r1 extra", "addto", "addto g1", "addto g1 r1 extra",
+    "group", "group g1", "ungroup", "ungroup g1 extra",
     "tree r1 r2", "show", "show r1 r2", "help extra", "undo extra", "redo extra",
   ]) {
     it(`rejects the wrong argument count in ${JSON.stringify(line)}`, () => {

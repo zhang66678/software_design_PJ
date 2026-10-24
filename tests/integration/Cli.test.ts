@@ -7,6 +7,51 @@ import { fileURLToPath } from "node:url";
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
 
+  it("groups and ungroups siblings while retaining redo across rejected selections", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init",
+        "create g scene",
+        "create rect before 0 0 1 1 in scene",
+        "create rect r1 10 20 30 40 red in scene",
+        'create text label 10 40 "开始" in scene',
+        "create rect after 0 0 1 1 in scene",
+        "group node label r1", "tree scene", "show r1",
+        "ungroup node", "undo",
+        "group bad r1 node", "ungroup scene", "ungroup r1",
+        "redo", "show r1", "undo", "undo", "redo", "show label",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, [
+      "error: cannot group a container into its own descendant: node",
+      "error: cannot ungroup top-level container: scene",
+      "error: not a container: r1",
+      "",
+    ].join("\n"));
+    assert.ok(result.stdout.includes([
+      "g#scene",
+      "├── rect#before  x=0 y=0 width=1 height=1",
+      "├── g#node",
+      "│   ├── rect#r1  x=10 y=20 width=30 height=40  fill=red",
+      '│   └── text#label  x=10 y=40  "开始"',
+      "└── rect#after  x=0 y=0 width=1 height=1",
+    ].join("\n")));
+    for (const output of [
+      "g#node created with 2 children",
+      "rect#r1  parent=g#node",
+      "redone: g#node ungrouped with 2 children",
+      "rect#r1  parent=g#scene",
+    ]) {
+      assert.ok(result.stdout.includes(output), output);
+    }
+    assert.ok(result.stdout.endsWith('text#label  parent=g#node\n  x=10 y=40\n  text="开始"\n'));
+  });
+
   it("moves and deletes complete subtrees while preserving history across errors", () => {
     const result = spawnSync(execPath, [entry], {
       input: [

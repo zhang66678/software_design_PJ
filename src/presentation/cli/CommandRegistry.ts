@@ -3,12 +3,14 @@ import { AddToCommand } from "../../application/commands/AddToCommand.js";
 import type { Command } from "../../application/commands/Command.js";
 import { CreateCommand } from "../../application/commands/CreateCommand.js";
 import { DeleteCommand } from "../../application/commands/DeleteCommand.js";
+import { GroupCommand } from "../../application/commands/GroupCommand.js";
 import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
 import { RedoCommand } from "../../application/commands/RedoCommand.js";
 import { ScaleCommand } from "../../application/commands/ScaleCommand.js";
 import { SetCommand } from "../../application/commands/SetCommand.js";
 import { UndoCommand } from "../../application/commands/UndoCommand.js";
+import { UngroupCommand } from "../../application/commands/UngroupCommand.js";
 import type { ShapeFactory } from "../../application/factories/ShapeFactory.js";
 import type { EditorSession } from "../../application/session/EditorSession.js";
 import { HelpCommand } from "../commands/HelpCommand.js";
@@ -66,6 +68,20 @@ export class CommandRegistry {
         create: (args, syntax) => {
           args.expectCount(2, 2, syntax);
           return new AddToCommand(args.stringAt(0, "container id"), args.stringAt(1, "id"));
+        },
+      }],
+      ["group", {
+        syntax: "group <newGid> <id1> <id2>...",
+        create: (args, syntax) => {
+          args.expectCount(2, Infinity, syntax);
+          return new GroupCommand(args.stringAt(0, "new group id"), args.slice(1));
+        },
+      }],
+      ["ungroup", {
+        syntax: "ungroup <gid>",
+        create: (args, syntax) => {
+          args.expectCount(1, 1, syntax);
+          return new UngroupCommand(args.stringAt(0, "group id"));
         },
       }],
       ["move", {
