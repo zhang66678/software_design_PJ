@@ -1,0 +1,22 @@
+# 作业第 6 节典型会话；从项目根目录回放
+init 800 600
+create rect bg 0 0 800 600 #ffffff
+create text title 20 40 "My Diagram"
+create circle c1 100 100 20 red
+create rect box 200 80 60 60 #3366ff
+group markers c1 box
+tree
+move c1 30 0
+undo
+redo
+set title text "My Diagram v2"
+undo
+# 预期错误：同时选择容器与其后代，文档应保持不变
+group bad c1 markers
+delete box
+undo
+save examples/output/demo.svg
+# 预期错误：保存后的历史屏障
+undo
+read examples/other.svg
+tree

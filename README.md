@@ -141,6 +141,21 @@ save
 
 读取范围为 UTF-8 XML 1.0 SVG，几何值支持有限数和 px 单位，未提供的图形几何属性按 0 处理。画布需提供正的 width/height，或由 viewBox 提供尺寸；viewBox 须以 (0,0) 为原点且与画布尺寸一致。不支持的元素、transform、CSS、字体等属性，以及 DTD 和处理指令会明确报错。本项目保存的文件可以完整读回。
 
+## 回放课程示例
+
+项目提供[典型会话](examples/typical-session.txt)、[两节点流程图](examples/flowchart.txt)和[外部 SVG](examples/other.svg)。在项目根目录用 PowerShell 执行：
+
+```powershell
+npm run build
+New-Item -ItemType Directory -Force examples/output | Out-Null
+cmd /c "node dist/bootstrap/Main.js < examples\flowchart.txt"
+cmd /c "node dist/bootstrap/Main.js < examples\typical-session.txt"
+```
+
+Linux/macOS 可先执行 `mkdir -p examples/output`，再用 `node dist/bootstrap/Main.js < examples/flowchart.txt` 或对应的典型会话文件回放。
+
+生成的 `flowchart.svg` 和 `demo.svg` 位于 `examples/output/`，可直接用浏览器打开，该目录不纳入版本控制。典型会话预期输出两条错误（非法分组、保存后撤销）和一条自动补 id 警告，随后继续正常执行；流程图示例应无错误。
+
 ## 命令
 
 | 语法 | 用途 |
