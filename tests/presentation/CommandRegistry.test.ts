@@ -6,6 +6,7 @@ import { EditorSession } from "../../src/application/session/EditorSession.js";
 import { CommandRegistry } from "../../src/presentation/cli/CommandRegistry.js";
 import { Tokenizer } from "../../src/presentation/cli/Tokenizer.js";
 import { DocumentFormatter } from "../../src/presentation/formatters/DocumentFormatter.js";
+import { TestSvgStorage } from "../support/TestSvgStorage.js";
 
 describe("CommandRegistry", () => {
   let session: EditorSession;
@@ -15,7 +16,7 @@ describe("CommandRegistry", () => {
   beforeEach(() => {
     session = new EditorSession();
     const executor = new CommandExecutor(session);
-    registry = new CommandRegistry(new ShapeFactory(), session, new DocumentFormatter());
+    registry = new CommandRegistry(new ShapeFactory(), session, new DocumentFormatter(), new TestSvgStorage());
     const tokenizer = new Tokenizer();
     run = (line) => registry.parse(tokenizer.tokenize(line)).execute(executor);
   });
@@ -25,6 +26,7 @@ describe("CommandRegistry", () => {
       "Commands:",
       "  init [w] [h]",
       "  canvas [w] [h]",
+      "  save [file.svg]",
       "  create <type> <id> [params...] [in <containerId>]",
       "  delete <id>",
       "  addto <gid> <id>",
@@ -63,6 +65,7 @@ describe("CommandRegistry", () => {
     "delete", "delete r1 extra", "addto", "addto g1", "addto g1 r1 extra",
     "group", "group g1", "ungroup", "ungroup g1 extra",
     "front", "front r1 extra", "back", "back r1 extra", "canvas 1 2 3",
+    "save a.svg extra",
     "tree r1 r2", "show", "show r1 r2", "help extra", "undo extra", "redo extra",
   ]) {
     it(`rejects the wrong argument count in ${JSON.stringify(line)}`, () => {
@@ -80,6 +83,13 @@ describe("CommandRegistry", () => {
     for (const line of ["tree", "show r1"]) {
       assert.throws(() => run(line), { message: "no document. use 'init' or 'read' first" });
     }
+  });
+
+  it("preserves quoted file paths and supplies save's default path", () => {
+    run("init");
+    assert.equal(run('save "图 表.svg"'), "saved to 图 表.svg (0 elements)");
+    assert.equal(run("save"), "saved to 图 表.svg (0 elements)");
+    assert.equal(session.filePath, "图 表.svg");
   });
 
   it("does not clear a history barrier through display commands", () => {

@@ -20,7 +20,7 @@ export class CanvasCommand extends Command {
       return `canvas ${document.width}x${document.height}`;
     }
     const resized = document.withSize(this.#width ?? document.width, this.#height ?? document.height);
-    executor.replaceDocument(resized);
+    executor.replaceDocument(resized, this.#session.filePath);
     return `canvas resized to ${resized.width}x${resized.height}`;
   }
 }

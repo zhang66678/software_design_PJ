@@ -4,13 +4,23 @@ import { DocumentSnapshot } from "../history/DocumentSnapshot.js";
 
 export class EditorSession {
   #snapshot: DocumentSnapshot | undefined;
+  #filePath: string | undefined;
+
+  public get filePath(): string | undefined {
+    return this.#filePath;
+  }
+
+  public setFilePath(filePath: string): void {
+    this.#filePath = filePath;
+  }
 
   public getDocument(): SvgDocument {
     return this.capture().restore();
   }
 
-  public replaceDocument(document: SvgDocument): void {
+  public replaceDocument(document: SvgDocument, filePath?: string): void {
     this.restore(new DocumentSnapshot(document));
+    this.#filePath = filePath;
   }
 
   public capture(): DocumentSnapshot {

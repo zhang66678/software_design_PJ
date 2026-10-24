@@ -35,8 +35,8 @@ export class CommandExecutor {
     return this.#history.redo(this.#session);
   }
 
-  public replaceDocument(document: SvgDocument): void {
-    this.#session.replaceDocument(document);
+  public replaceDocument(document: SvgDocument, filePath?: string): void {
+    this.#session.replaceDocument(document, filePath);
     this.#history.setBarrier();
   }
 

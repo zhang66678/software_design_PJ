@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { EditorSession } from "../../src/application/session/EditorSession.js";
 import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { Rect } from "../../src/domain/shapes/Rect.js";
+import { UnclonableRect } from "../support/UnclonableRect.js";
 
 describe("EditorSession", () => {
   it("reports an absent document for reads and captures", () => {
@@ -60,5 +61,28 @@ describe("EditorSession", () => {
     assert.deepEqual([restored.width, restored.height], [400, 300]);
     assert.deepEqual(restored.getShapes().map((shape) => shape.id), ["r2", "r1"]);
     assert.ok(restored.getShape("r1") instanceof Rect);
+  });
+
+  it("keeps the current file path during edit restoration and clears it for a new document", () => {
+    const session = new EditorSession();
+    session.replaceDocument(new SvgDocument(400, 300), "read.svg");
+    const snapshot = session.capture();
+    session.setFilePath("saved.svg");
+    session.restore(snapshot);
+
+    assert.equal(session.filePath, "saved.svg");
+    session.replaceDocument(new SvgDocument());
+    assert.equal(session.filePath, undefined);
+  });
+
+  it("preserves both the document and its file path when replacement cannot be captured", () => {
+    const session = new EditorSession();
+    session.replaceDocument(new SvgDocument(400, 300), "original.svg");
+    const invalid = new SvgDocument();
+    invalid.add(new UnclonableRect("broken", 0, 0, 1, 1));
+
+    assert.throws(() => session.replaceDocument(invalid, "new.svg"), { message: "cannot clone test rectangle" });
+    assert.equal(session.filePath, "original.svg");
+    assert.deepEqual([session.getDocument().width, session.getDocument().height], [400, 300]);
   });
 });

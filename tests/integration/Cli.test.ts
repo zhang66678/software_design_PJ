@@ -1,11 +1,55 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { execPath } from "node:process";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
+
+  it("saves real SVG files and retains the default path and redo only when appropriate", (context) => {
+    const directory = mkdtempSync(join(tmpdir(), "svg-cli-save-"));
+    context.after(() => {
+      assert.equal(dirname(directory), resolve(tmpdir()));
+      assert.ok(basename(directory).startsWith("svg-cli-save-"));
+      rmSync(directory, { recursive: true, force: true });
+    });
+    const result = spawnSync(execPath, [entry], {
+      cwd: directory,
+      input: [
+        "save before.svg", "init 400 200", "save",
+        "create g scene",
+        "create rect r1 10 20 30 40 red in scene",
+        'create text title 10 40 "开始 & <结束>" in scene',
+        'save "画 布.svg"', "undo",
+        "move r1 5 0", "undo", "save missing/fail.svg", "redo",
+        "canvas 640 300", "save", "init", "save",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, [
+      "error: no document. use 'init' or 'read' first",
+      "error: no file path. use 'save <file.svg>' first",
+      "error: undo not allowed after io command",
+      "error: cannot write file: missing/fail.svg",
+      "error: no file path. use 'save <file.svg>' first",
+      "",
+    ].join("\n"));
+    assert.equal(result.stdout.split("saved to 画 布.svg (3 elements)").length - 1, 2);
+    assert.ok(result.stdout.includes("redone: rect#r1 moved by (5,0)"));
+    const xml = readFileSync(join(directory, "画 布.svg"), "utf8");
+    assert.ok(xml.includes('width="640" height="300" viewBox="0 0 640 300"'));
+    assert.ok(xml.includes('<rect id="r1" fill="red" x="15" y="20" width="30" height="40"/>'));
+    assert.ok(xml.includes('开始 &amp; &lt;结束&gt;</text>'));
+    assert.deepEqual(readdirSync(directory), ["画 布.svg"]);
+  });
 
   it("reorders siblings and applies the canvas query and resize history rules", () => {
     const result = spawnSync(execPath, [entry], {

@@ -11,10 +11,12 @@ import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
 import { RedoCommand } from "../../application/commands/RedoCommand.js";
 import { ScaleCommand } from "../../application/commands/ScaleCommand.js";
+import { SaveCommand } from "../../application/commands/SaveCommand.js";
 import { SetCommand } from "../../application/commands/SetCommand.js";
 import { UndoCommand } from "../../application/commands/UndoCommand.js";
 import { UngroupCommand } from "../../application/commands/UngroupCommand.js";
 import type { ShapeFactory } from "../../application/factories/ShapeFactory.js";
+import type { SvgStorage } from "../../application/ports/SvgStorage.js";
 import type { EditorSession } from "../../application/session/EditorSession.js";
 import { HelpCommand } from "../commands/HelpCommand.js";
 import { ShowCommand } from "../commands/ShowCommand.js";
@@ -35,6 +37,7 @@ export class CommandRegistry {
     factory: ShapeFactory,
     session: EditorSession,
     formatter: DocumentFormatter,
+    storage: SvgStorage,
   ) {
     this.#definitions = new Map<string, CommandDefinition>([
       ["init", {
@@ -53,6 +56,13 @@ export class CommandRegistry {
           const width = args.optionalAt(0) === undefined ? undefined : args.numberAt(0, "width");
           const height = args.optionalAt(1) === undefined ? undefined : args.numberAt(1, "height");
           return new CanvasCommand(session, width, height);
+        },
+      }],
+      ["save", {
+        syntax: "save [file.svg]",
+        create: (args, syntax) => {
+          args.expectCount(0, 1, syntax);
+          return new SaveCommand(session, storage, args.optionalAt(0));
         },
       }],
       ["create", {
