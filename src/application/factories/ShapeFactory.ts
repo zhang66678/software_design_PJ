@@ -11,26 +11,66 @@ import { ApplicationError } from "../errors/ApplicationError.js";
 
 type ShapeCreator = (id: string, parameters: readonly string[]) => Shape;
 
+interface ShapeDefinition {
+  readonly create: ShapeCreator;
+  readonly geometry: readonly string[];
+  readonly text?: boolean;
+}
+
 export class ShapeFactory {
   // Refactoring point: shape-name dispatch is confined to this factory.
-  readonly #creators = new Map<string, ShapeCreator>([
-    ["rect", (id, parameters) => this.createRect(id, parameters)],
-    ["circle", (id, parameters) => this.createCircle(id, parameters)],
-    ["ellipse", (id, parameters) => this.createEllipse(id, parameters)],
-    ["line", (id, parameters) => this.createLine(id, parameters)],
-    ["text", (id, parameters) => this.createText(id, parameters)],
-    ["g", (id, parameters) => this.createGroup(id, parameters)],
+  readonly #definitions = new Map<string, ShapeDefinition>([
+    ["rect", { create: (id, args) => this.createRect(id, args), geometry: ["x", "y", "width", "height"] }],
+    ["circle", { create: (id, args) => this.createCircle(id, args), geometry: ["cx", "cy", "r"] }],
+    ["ellipse", { create: (id, args) => this.createEllipse(id, args), geometry: ["cx", "cy", "rx", "ry"] }],
+    ["line", { create: (id, args) => this.createLine(id, args), geometry: ["x1", "y1", "x2", "y2"] }],
+    ["text", { create: (id, args) => this.createText(id, args), geometry: ["x", "y"], text: true }],
+    ["g", { create: (id, args) => this.createGroup(id, args), geometry: [] }],
   ]);
 
   public create(type: string, id: string, parameters: readonly string[]): Shape {
-    const creator = this.#creators.get(type);
-    if (creator === undefined) {
+    return this.definition(type).create(id, parameters);
+  }
+
+  public fromSvg(
+    type: string, id: string, attributes: Readonly<Record<string, string>>,
+    textContent: string, children: readonly Shape[],
+  ): Shape {
+    const definition = this.definition(type);
+    const styles = ["fill", "stroke", "stroke-width"];
+    const allowed = new Set(["id", ...definition.geometry, ...styles]);
+    for (const attribute of Object.keys(attributes)) {
+      if (!allowed.has(attribute)) {
+        throw new ApplicationError(`unsupported SVG attribute: ${attribute} on <${type}>`);
+      }
+    }
+    if (!definition.text && textContent.trim().length > 0) {
+      throw new ApplicationError(`unexpected text in <${type}>`);
+    }
+    const parameters = definition.geometry.map((name) => (attributes[name] ?? "0").trim().replace(/px$/u, ""));
+    if (definition.text) {
+      parameters.push(textContent);
+    }
+    const shape = definition.create(id, parameters);
+    for (const attribute of styles) {
+      const value = attributes[attribute];
+      if (value !== undefined) {
+        shape.set(attribute, attribute === "stroke-width" ? value.trim().replace(/px$/u, "") : value);
+      }
+    }
+
+    return children.length === 0 ? shape : shape.withChildren(children);
+  }
+
+  private definition(type: string): ShapeDefinition {
+    const definition = this.#definitions.get(type);
+    if (definition === undefined) {
       throw new ApplicationError(
         `unknown shape type: ${type} (is the plugin loaded?)`,
       );
     }
 
-    return creator(id, parameters);
+    return definition;
   }
 
   private createRect(id: string, parameters: readonly string[]): Rect {

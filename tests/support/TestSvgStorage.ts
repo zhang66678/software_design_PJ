@@ -1,10 +1,20 @@
 import { ApplicationError } from "../../src/application/errors/ApplicationError.js";
-import type { SvgStorage } from "../../src/application/ports/SvgStorage.js";
+import type { SvgReadResult, SvgStorage } from "../../src/application/ports/SvgStorage.js";
 import type { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 
 export class TestSvgStorage implements SvgStorage {
   public readonly writes: { readonly document: SvgDocument; readonly filePath: string }[] = [];
   public failWrites = false;
+  public readonly reads = new Map<string, SvgReadResult>();
+
+  public read(filePath: string): SvgReadResult {
+    const result = this.reads.get(filePath);
+    if (result === undefined) {
+      throw new ApplicationError(`cannot read file: ${filePath}`);
+    }
+
+    return result;
+  }
 
   public save(document: SvgDocument, filePath: string): void {
     if (this.failWrites) {

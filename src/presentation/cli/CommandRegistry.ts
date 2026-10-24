@@ -9,6 +9,7 @@ import { FrontCommand } from "../../application/commands/FrontCommand.js";
 import { GroupCommand } from "../../application/commands/GroupCommand.js";
 import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
+import { ReadCommand } from "../../application/commands/ReadCommand.js";
 import { RedoCommand } from "../../application/commands/RedoCommand.js";
 import { ScaleCommand } from "../../application/commands/ScaleCommand.js";
 import { SaveCommand } from "../../application/commands/SaveCommand.js";
@@ -56,6 +57,13 @@ export class CommandRegistry {
           const width = args.optionalAt(0) === undefined ? undefined : args.numberAt(0, "width");
           const height = args.optionalAt(1) === undefined ? undefined : args.numberAt(1, "height");
           return new CanvasCommand(session, width, height);
+        },
+      }],
+      ["read", {
+        syntax: "read <file.svg>",
+        create: (args, syntax) => {
+          args.expectCount(1, 1, syntax);
+          return new ReadCommand(storage, args.stringAt(0, "file path"));
         },
       }],
       ["save", {

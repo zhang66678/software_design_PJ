@@ -56,4 +56,35 @@ describe("NodeSvgStorage", () => {
     assert.equal(readFileSync(filePath, "utf8"), "original content");
     assert.deepEqual(readdirSync(directory), ["original.svg"]);
   });
+
+  it("reads saved UTF-8 SVG through a Chinese path without modifying the source", () => {
+    const filePath = join(directory, "图 表.svg");
+    const document = new SvgDocument(400, 300);
+    document.add(new Text("title", 10, 40, "开始 & <结束> 😀"));
+    storage.save(document, filePath);
+    const original = readFileSync(filePath);
+    const result = storage.read(filePath);
+
+    assert.equal(new SvgCodec().encode(result.document), original.toString("utf8"));
+    assert.deepEqual(result.warnings, []);
+    assert.deepEqual(readFileSync(filePath), original);
+  });
+
+  it("rejects missing files, directories and invalid UTF-8 without changing them", () => {
+    const invalid = join(directory, "invalid.svg");
+    const bytes = Buffer.from([0xc3, 0x28]);
+    writeFileSync(invalid, bytes);
+    for (const filePath of [join(directory, "missing.svg"), directory, invalid]) {
+      assert.throws(() => storage.read(filePath), { message: `cannot read file: ${filePath}` });
+    }
+    assert.deepEqual(readFileSync(invalid), bytes);
+  });
+
+  it("retains XML parsing errors and does not rewrite a malformed file", () => {
+    const filePath = join(directory, "broken.svg");
+    const source = '<svg width="400" height="300"><g></svg>';
+    writeFileSync(filePath, source, "utf8");
+    assert.throws(() => storage.read(filePath), { message: /^invalid SVG XML:/u });
+    assert.equal(readFileSync(filePath, "utf8"), source);
+  });
 });

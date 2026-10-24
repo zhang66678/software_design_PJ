@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { closeSync, openSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { ApplicationError } from "../../application/errors/ApplicationError.js";
-import type { SvgStorage } from "../../application/ports/SvgStorage.js";
+import type { SvgReadResult, SvgStorage } from "../../application/ports/SvgStorage.js";
 import type { SvgDocument } from "../../domain/document/SvgDocument.js";
 import { SvgCodec } from "../svg/SvgCodec.js";
 
@@ -11,6 +11,17 @@ export class NodeSvgStorage implements SvgStorage {
 
   public constructor(codec: SvgCodec = new SvgCodec()) {
     this.#codec = codec;
+  }
+
+  public read(filePath: string): SvgReadResult {
+    let source: string;
+    try {
+      source = new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(filePath));
+    } catch {
+      throw new ApplicationError(`cannot read file: ${filePath}`);
+    }
+
+    return this.#codec.decode(source);
   }
 
   public save(document: SvgDocument, filePath: string): void {

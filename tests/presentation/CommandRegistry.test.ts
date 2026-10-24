@@ -3,6 +3,7 @@ import { beforeEach, describe, it } from "node:test";
 import { CommandExecutor } from "../../src/application/commands/CommandExecutor.js";
 import { ShapeFactory } from "../../src/application/factories/ShapeFactory.js";
 import { EditorSession } from "../../src/application/session/EditorSession.js";
+import { SvgDocument } from "../../src/domain/document/SvgDocument.js";
 import { CommandRegistry } from "../../src/presentation/cli/CommandRegistry.js";
 import { Tokenizer } from "../../src/presentation/cli/Tokenizer.js";
 import { DocumentFormatter } from "../../src/presentation/formatters/DocumentFormatter.js";
@@ -11,12 +12,14 @@ import { TestSvgStorage } from "../support/TestSvgStorage.js";
 describe("CommandRegistry", () => {
   let session: EditorSession;
   let registry: CommandRegistry;
+  let storage: TestSvgStorage;
   let run: (line: string) => string;
 
   beforeEach(() => {
     session = new EditorSession();
     const executor = new CommandExecutor(session);
-    registry = new CommandRegistry(new ShapeFactory(), session, new DocumentFormatter(), new TestSvgStorage());
+    storage = new TestSvgStorage();
+    registry = new CommandRegistry(new ShapeFactory(), session, new DocumentFormatter(), storage);
     const tokenizer = new Tokenizer();
     run = (line) => registry.parse(tokenizer.tokenize(line)).execute(executor);
   });
@@ -26,6 +29,7 @@ describe("CommandRegistry", () => {
       "Commands:",
       "  init [w] [h]",
       "  canvas [w] [h]",
+      "  read <file.svg>",
       "  save [file.svg]",
       "  create <type> <id> [params...] [in <containerId>]",
       "  delete <id>",
@@ -65,7 +69,7 @@ describe("CommandRegistry", () => {
     "delete", "delete r1 extra", "addto", "addto g1", "addto g1 r1 extra",
     "group", "group g1", "ungroup", "ungroup g1 extra",
     "front", "front r1 extra", "back", "back r1 extra", "canvas 1 2 3",
-    "save a.svg extra",
+    "save a.svg extra", "read", "read a.svg extra",
     "tree r1 r2", "show", "show r1 r2", "help extra", "undo extra", "redo extra",
   ]) {
     it(`rejects the wrong argument count in ${JSON.stringify(line)}`, () => {
@@ -90,6 +94,13 @@ describe("CommandRegistry", () => {
     assert.equal(run('save "图 表.svg"'), "saved to 图 表.svg (0 elements)");
     assert.equal(run("save"), "saved to 图 表.svg (0 elements)");
     assert.equal(session.filePath, "图 表.svg");
+  });
+
+  it("reads a quoted path before init and uses it for the next save", () => {
+    storage.reads.set("图 表.svg", { document: new SvgDocument(400, 300), warnings: [] });
+    assert.equal(run('read "图 表.svg"'), "read 图 表.svg (0 elements)");
+    assert.equal(run("save"), "saved to 图 表.svg (0 elements)");
+    assert.equal(storage.writes[0]?.filePath, "图 表.svg");
   });
 
   it("does not clear a history barrier through display commands", () => {

@@ -4,6 +4,7 @@ import { ShapeFactory } from "../application/factories/ShapeFactory.js";
 import { EditorSession } from "../application/session/EditorSession.js";
 import { NodeTerminal } from "../infrastructure/terminal/NodeTerminal.js";
 import { NodeSvgStorage } from "../infrastructure/storage/NodeSvgStorage.js";
+import { SvgCodec } from "../infrastructure/svg/SvgCodec.js";
 import { CliLoop } from "../presentation/cli/CliLoop.js";
 import { CommandRegistry } from "../presentation/cli/CommandRegistry.js";
 import { Tokenizer } from "../presentation/cli/Tokenizer.js";
@@ -14,7 +15,9 @@ export class Main {
   public async run(): Promise<void> {
     const session = new EditorSession();
     const executor = new CommandExecutor(session);
-    const registry = new CommandRegistry(new ShapeFactory(), session, new DocumentFormatter(), new NodeSvgStorage());
+    const factory = new ShapeFactory();
+    const storage = new NodeSvgStorage(new SvgCodec(factory));
+    const registry = new CommandRegistry(factory, session, new DocumentFormatter(), storage);
     const loop = new CliLoop(new NodeTerminal(), new Tokenizer(), registry, executor, new ErrorFormatter());
     await loop.run();
   }

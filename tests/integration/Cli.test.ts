@@ -1,14 +1,59 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { execPath } from "node:process";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { SvgCodec } from "../../src/infrastructure/svg/SvgCodec.js";
 
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
+
+  it("reads before init, preserves redo on invalid imports, and saves back to the read path", (context) => {
+    const directory = mkdtempSync(join(tmpdir(), "svg-cli-read-"));
+    context.after(() => {
+      assert.equal(dirname(directory), resolve(tmpdir()));
+      assert.ok(basename(directory).startsWith("svg-cli-read-"));
+      rmSync(directory, { recursive: true, force: true });
+    });
+    writeFileSync(join(directory, "图 表.svg"), '<svg width="400" height="300"><g id="g1"><rect x="10" width="20" height="30"/><text id="t1">开始 &amp; 结束</text></g></svg>', "utf8");
+    writeFileSync(join(directory, "broken.svg"), '<svg width="1" height="1"><rect/></g></svg>', "utf8");
+    writeFileSync(join(directory, "duplicate.svg"), '<svg width="1" height="1"><rect id="a"/><circle id="a"/></svg>', "utf8");
+    const result = spawnSync(execPath, [entry], {
+      cwd: directory,
+      input: [
+        'read "图 表.svg"', "tree", "undo",
+        "move rect1 5 0", "undo", "read missing.svg", "read broken.svg", "read duplicate.svg", "redo",
+        "save", 'read "图 表.svg"', "redo", "show rect1", "show t1", "save copy.svg",
+        "init", "save",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    const errors = result.stderr.trim().split("\n");
+    assert.equal(errors.length, 6);
+    assert.equal(errors[0], "error: undo not allowed after io command");
+    assert.equal(errors[1], "error: cannot read file: missing.svg");
+    assert.match(errors[2] ?? "", /^error: invalid SVG XML:/u);
+    assert.equal(errors[3], "error: id already exists: a");
+    assert.equal(errors[4], "error: undo not allowed after io command");
+    assert.equal(errors[5], "error: no file path. use 'save <file.svg>' first");
+    assert.equal(result.stdout.split("warning: assigned id rect1 to unnamed <rect>").length - 1, 1);
+    assert.equal(result.stdout.split("read 图 表.svg (3 elements)").length - 1, 2);
+    assert.ok(result.stdout.includes("redone: rect#rect1 moved by (5,0)"));
+    assert.ok(result.stdout.includes("rect#rect1  parent=g#g1\n  x=15 y=0 width=20 height=30"));
+    assert.ok(result.stdout.includes('text="开始 & 结束"'));
+    const original = readFileSync(join(directory, "图 表.svg"), "utf8");
+    assert.equal(readFileSync(join(directory, "copy.svg"), "utf8"), original);
+    const loaded = new SvgCodec().decode(original);
+    assert.deepEqual(loaded.warnings, []);
+    assert.equal(loaded.document.getShape("rect1").describe().attributes.x, 15);
+  });
 
   it("saves real SVG files and retains the default path and redo only when appropriate", (context) => {
     const directory = mkdtempSync(join(tmpdir(), "svg-cli-save-"));
