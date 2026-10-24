@@ -7,6 +7,42 @@ import { fileURLToPath } from "node:url";
 describe("CLI entry", () => {
   const entry = fileURLToPath(new URL("../../src/bootstrap/Main.js", import.meta.url));
 
+  it("reorders siblings and applies the canvas query and resize history rules", () => {
+    const result = spawnSync(execPath, [entry], {
+      input: [
+        "init 400 300",
+        "create g scene",
+        "create rect a 1 2 3 4 in scene",
+        "create rect b 5 6 7 8 in scene",
+        "front a", "tree scene", "undo", "canvas", "redo",
+        "back a", "tree scene",
+        "canvas 640", "undo", "redo",
+        "front a", "canvas 0 100", "undo", "tree",
+      ].join("\n"),
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0);
+    assert.equal(result.stderr, [
+      "error: undo not allowed after io command",
+      "error: undo not allowed after io command",
+      "error: canvas dimensions must be positive finite numbers",
+      "",
+    ].join("\n"));
+    assert.ok(result.stdout.includes("g#scene\n├── rect#b  x=5 y=6 width=7 height=8\n└── rect#a  x=1 y=2 width=3 height=4"));
+    assert.ok(result.stdout.includes("canvas 400x300\nredone: rect#a brought to front"));
+    assert.ok(result.stdout.includes("canvas resized to 640x300"));
+    assert.ok(result.stdout.endsWith([
+      "svg (640x300)",
+      "└── g#scene",
+      "    ├── rect#a  x=1 y=2 width=3 height=4",
+      "    └── rect#b  x=5 y=6 width=7 height=8",
+      "",
+    ].join("\n")));
+  });
+
   it("groups and ungroups siblings while retaining redo across rejected selections", () => {
     const result = spawnSync(execPath, [entry], {
       input: [

@@ -140,17 +140,47 @@ export class SvgDocument {
     return group;
   }
 
+  public bringToFront(id: string): Shape {
+    return this.reorder(id, true);
+  }
+
+  public sendToBack(id: string): Shape {
+    return this.reorder(id, false);
+  }
+
   public getShapes(): readonly Shape[] {
     return Object.freeze([...this.#shapes]);
   }
 
   public clone(): SvgDocument {
-    const copy = new SvgDocument(this.#width, this.#height);
+    return this.withSize(this.#width, this.#height);
+  }
+
+  public withSize(width: number, height: number): SvgDocument {
+    const copy = new SvgDocument(width, height);
     for (const shape of this.#shapes) {
       copy.add(shape.clone());
     }
 
     return copy;
+  }
+
+  private reorder(id: string, toFront: boolean): Shape {
+    const { shape, parent } = this.requireLocation(id);
+    const siblings = parent === undefined ? this.#shapes : parent.getChildren();
+    const updated = siblings.filter((sibling) => sibling.id !== id);
+    if (toFront) {
+      updated.push(shape);
+    } else {
+      updated.unshift(shape);
+    }
+    if (parent === undefined) {
+      this.#shapes.splice(0, this.#shapes.length, ...updated);
+    } else {
+      this.replace(parent.id, [parent.withChildren(updated)]);
+    }
+
+    return shape;
   }
 
   private requireLocation(id: string): ShapeLocation {

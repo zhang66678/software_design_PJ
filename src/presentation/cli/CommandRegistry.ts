@@ -1,8 +1,11 @@
 import { CommandArguments } from "../../application/arguments/CommandArguments.js";
 import { AddToCommand } from "../../application/commands/AddToCommand.js";
+import { BackCommand } from "../../application/commands/BackCommand.js";
+import { CanvasCommand } from "../../application/commands/CanvasCommand.js";
 import type { Command } from "../../application/commands/Command.js";
 import { CreateCommand } from "../../application/commands/CreateCommand.js";
 import { DeleteCommand } from "../../application/commands/DeleteCommand.js";
+import { FrontCommand } from "../../application/commands/FrontCommand.js";
 import { GroupCommand } from "../../application/commands/GroupCommand.js";
 import { InitCommand } from "../../application/commands/InitCommand.js";
 import { MoveCommand } from "../../application/commands/MoveCommand.js";
@@ -41,6 +44,15 @@ export class CommandRegistry {
           const width = args.optionalAt(0) === undefined ? undefined : args.numberAt(0, "width");
           const height = args.optionalAt(1) === undefined ? undefined : args.numberAt(1, "height");
           return new InitCommand(width, height);
+        },
+      }],
+      ["canvas", {
+        syntax: "canvas [w] [h]",
+        create: (args, syntax) => {
+          args.expectCount(0, 2, syntax);
+          const width = args.optionalAt(0) === undefined ? undefined : args.numberAt(0, "width");
+          const height = args.optionalAt(1) === undefined ? undefined : args.numberAt(1, "height");
+          return new CanvasCommand(session, width, height);
         },
       }],
       ["create", {
@@ -82,6 +94,20 @@ export class CommandRegistry {
         create: (args, syntax) => {
           args.expectCount(1, 1, syntax);
           return new UngroupCommand(args.stringAt(0, "group id"));
+        },
+      }],
+      ["front", {
+        syntax: "front <id>",
+        create: (args, syntax) => {
+          args.expectCount(1, 1, syntax);
+          return new FrontCommand(args.stringAt(0, "id"));
+        },
+      }],
+      ["back", {
+        syntax: "back <id>",
+        create: (args, syntax) => {
+          args.expectCount(1, 1, syntax);
+          return new BackCommand(args.stringAt(0, "id"));
         },
       }],
       ["move", {

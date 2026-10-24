@@ -24,11 +24,14 @@ describe("CommandRegistry", () => {
     assert.equal(run("help"), [
       "Commands:",
       "  init [w] [h]",
+      "  canvas [w] [h]",
       "  create <type> <id> [params...] [in <containerId>]",
       "  delete <id>",
       "  addto <gid> <id>",
       "  group <newGid> <id1> <id2>...",
       "  ungroup <gid>",
+      "  front <id>",
+      "  back <id>",
       "  move <id> <dx> <dy>",
       "  scale <id> <factor>",
       "  set <id> <attr> <value>",
@@ -59,6 +62,7 @@ describe("CommandRegistry", () => {
     "scale r1", "set r1 fill",
     "delete", "delete r1 extra", "addto", "addto g1", "addto g1 r1 extra",
     "group", "group g1", "ungroup", "ungroup g1 extra",
+    "front", "front r1 extra", "back", "back r1 extra", "canvas 1 2 3",
     "tree r1 r2", "show", "show r1 r2", "help extra", "undo extra", "redo extra",
   ]) {
     it(`rejects the wrong argument count in ${JSON.stringify(line)}`, () => {
@@ -81,6 +85,8 @@ describe("CommandRegistry", () => {
   it("does not clear a history barrier through display commands", () => {
     run("init");
     assert.equal(run("tree"), "svg (800x600)");
+    assert.equal(run("canvas"), "canvas 800x600");
+    assert.throws(() => run("canvas 0 100"), { message: "canvas dimensions must be positive finite numbers" });
     run("help");
     assert.throws(() => run("show missing"), { message: "no such shape: missing" });
     assert.throws(() => run("undo"), { message: "undo not allowed after io command" });
@@ -110,7 +116,7 @@ describe("CommandRegistry", () => {
     run("move r1 30 0");
     run("undo");
 
-    for (const line of ["init bad", "init 800 Infinity", "move r1 invalid 0", 'show "r1']) {
+    for (const line of ["init bad", "init 800 Infinity", "canvas bad", "canvas 800 Infinity", "move r1 invalid 0", 'show "r1']) {
       assert.throws(() => run(line));
     }
 
